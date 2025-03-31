@@ -35,7 +35,7 @@ public class RegistrationController {
      * @param sessionId 会话ID，首次对话可为空
      * @return SSE连接
      */
-    @GetMapping(value = "/ai-consult/connect", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/ai-consult/connect", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter createAiConsultConnection(
             @RequestParam(required = false) String sessionId) {
         log.info("接收到创建AI问诊SSE连接请求, sessionId: {}", sessionId);
