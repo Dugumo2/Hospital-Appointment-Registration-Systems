@@ -41,4 +41,9 @@ public class ConsultSession {
      * 会话状态：0-进行中，1-已结束
      */
     private Integer status;
+    
+    /**
+     * 版本号，用于乐观锁
+     */
+    private Integer version;
 } 

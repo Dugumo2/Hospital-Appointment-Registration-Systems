@@ -57,19 +57,22 @@ sa-token:
 
 mybatis-plus:
   type-aliases-package: com.graduation.his.domain.po
-  global-config:
-    db-config:
-      id-type: auto # 全局id类型为自增长
   mapper-locations: classpath:mapper/*.xml
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     map-underscore-to-camel-case: true
+#    global-config:
+#      db-config:
+#        id-type: auto # 全局id类型为自增长
 
 
 logging:
   level:
     org.ehcache: debug
 
+ai-service:
+  api-url: https://api.deepseek.com
+  api-key: sk-9487d59d27ce471091b8a7ab03d5d5ac
 
 #aliyun:
 #  oss:

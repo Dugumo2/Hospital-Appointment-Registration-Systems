@@ -3,28 +3,28 @@ package com.graduation.his.service.entity.impl;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.graduation.his.domain.dto.AIRequest;
-import com.graduation.his.domain.dto.AiConsultRequest;
-import com.graduation.his.domain.dto.ConsultSession;
-import com.graduation.his.domain.dto.Message;
-import com.graduation.his.domain.dto.MessageRecord;
-import com.graduation.his.domain.dto.ResponseFormat;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.graduation.his.common.Constants;
+import com.graduation.his.domain.dto.*;
 import com.graduation.his.domain.po.AiConsultRecord;
 import com.graduation.his.domain.vo.AiConsultResponse;
 import com.graduation.his.mapper.AiConsultRecordMapper;
 import com.graduation.his.service.entity.IAIService;
 import com.graduation.his.utils.redis.IRedisService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
 import org.redisson.api.RMap;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.netty.http.client.HttpClient;
@@ -32,7 +32,10 @@ import reactor.netty.http.client.HttpClient;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -55,25 +58,24 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
     @Autowired
     private IRedisService redisService;
     
-    // Redis会话前缀 
-    private static final String AI_CONSULT_SESSION = "ai_consult:session:";
-    
     // 会话过期时间（6小时）
     private static final long SESSION_EXPIRE_HOURS = 6;
     
-    // DeepSeek API密钥 (实际使用时应放在配置文件中)
-    private static final String API_KEY = "sk-9487d59d27ce471091b8a7ab03d5d5ac";
+    // 分布式锁等待时间（秒）
+    private static final long LOCK_WAIT_TIME = 5;
     
-    // DeepSeek API地址
-    private static final String API_URL = "https://api.deepseek.com";
-    
+    // 分布式锁租约时间（秒）
+    private static final long LOCK_LEASE_TIME = 10;
+
+
     // WebClient实例，用于发送HTTP请求
     private final WebClient webClient;
     
     /**
-     * 构造方法，初始化WebClient
+     * 构造方法，初始化WebClient和AI常量
      */
-    public AIServiceImpl() {
+    public AIServiceImpl(@Value("${ai-service.api-key}") final String API_KEY,
+                         @Value("${ai-service.api-url}") final String API_URL) {
         // 创建HttpClient实例，设置超时时间为3分钟
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 180000) // 连接超时3分钟
@@ -93,12 +95,10 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
     }
     
     /**
-     * 获取Redis中的会话Map
-     * @param sessionId 会话ID
-     * @return Redis中的会话Map
+     * 获取Redis中的会话Map（带分布式锁）
      */
     private RMap<String, Object> getSessionMap(String sessionId) {
-        String redisKey = AI_CONSULT_SESSION + sessionId;
+        String redisKey = Constants.RedisKey.AI_CONSULT_SESSION + sessionId;
         RMap<String, Object> sessionMap = redisService.getMap(redisKey);
         
         // 重置过期时间
@@ -108,50 +108,88 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
     }
     
     /**
-     * 将会话保存到Redis
-     * @param session 会话对象
+     * 获取分布式锁
+     */
+    private RLock getSessionLock(String sessionId) {
+        String lockKey = Constants.RedisKey.AI_CONSULT_LOCK + sessionId;
+        return redisService.getLock(lockKey);
+    }
+    
+    /**
+     * 将会话保存到Redis（带分布式锁）
      */
     private void saveSessionToRedis(ConsultSession session) {
         if (session == null || session.getSessionId() == null) {
             return;
         }
         
-        RMap<String, Object> sessionMap = getSessionMap(session.getSessionId());
-        sessionMap.put("sessionId", session.getSessionId());
-        sessionMap.put("patientId", session.getPatientId());
-        sessionMap.put("appointmentId", session.getAppointmentId());
-        sessionMap.put("status", session.getStatus());
-        sessionMap.put("messageHistory", JSON.toJSONString(session.getMessageHistory()));
+        RLock lock = getSessionLock(session.getSessionId());
+        try {
+            // 尝试获取锁，等待5秒，10秒后自动释放
+            if (lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS)) {
+                try {
+                    RMap<String, Object> sessionMap = getSessionMap(session.getSessionId());
+                    sessionMap.put("sessionId", session.getSessionId());
+                    sessionMap.put("patientId", session.getPatientId());
+                    sessionMap.put("appointmentId", session.getAppointmentId());
+                    sessionMap.put("status", session.getStatus());
+                    sessionMap.put("messageHistory", JSON.toJSONString(session.getMessageHistory()));
+                    sessionMap.put("version", session.getVersion() + 1); // 增加版本号
+                } finally {
+                    lock.unlock();
+                }
+            } else {
+                log.warn("获取会话锁失败: {}", session.getSessionId());
+            }
+        } catch (InterruptedException e) {
+            log.error("保存会话到Redis时被中断: {}", e.getMessage());
+            Thread.currentThread().interrupt();
+        }
     }
     
     /**
-     * 从Redis获取会话
-     * @param sessionId 会话ID
-     * @return 会话对象
+     * 从Redis获取会话（带分布式锁）
      */
     private ConsultSession getSessionFromRedis(String sessionId) {
         if (sessionId == null) {
             return null;
         }
         
-        RMap<String, Object> sessionMap = getSessionMap(sessionId);
-        if (sessionMap.isEmpty()) {
+        RLock lock = getSessionLock(sessionId);
+        try {
+            if (lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS)) {
+                try {
+                    RMap<String, Object> sessionMap = getSessionMap(sessionId);
+                    if (sessionMap.isEmpty()) {
+                        return null;
+                    }
+                    
+                    List<MessageRecord> messageHistory = new ArrayList<>();
+                    String messageHistoryJson = (String) sessionMap.get("messageHistory");
+                    if (messageHistoryJson != null) {
+                        messageHistory = JSON.parseArray(messageHistoryJson, MessageRecord.class);
+                    }
+                    
+                    return ConsultSession.builder()
+                            .sessionId(sessionId)
+                            .patientId((Long) sessionMap.get("patientId"))
+                            .appointmentId((Long) sessionMap.get("appointmentId"))
+                            .status((Integer) sessionMap.get("status"))
+                            .messageHistory(messageHistory)
+                            .version((Integer) sessionMap.getOrDefault("version", 0))
+                            .build();
+                } finally {
+                    lock.unlock();
+                }
+            } else {
+                log.warn("获取会话锁失败: {}", sessionId);
+                return null;
+            }
+        } catch (InterruptedException e) {
+            log.error("从Redis获取会话时被中断: {}", e.getMessage());
+            Thread.currentThread().interrupt();
             return null;
         }
-        
-        List<MessageRecord> messageHistory = new ArrayList<>();
-        String messageHistoryJson = (String) sessionMap.get("messageHistory");
-        if (messageHistoryJson != null) {
-            messageHistory = JSON.parseArray(messageHistoryJson, MessageRecord.class);
-        }
-        
-        return ConsultSession.builder()
-                .sessionId(sessionId)
-                .patientId((Long) sessionMap.get("patientId"))
-                .appointmentId((Long) sessionMap.get("appointmentId"))
-                .status((Integer) sessionMap.get("status"))
-                .messageHistory(messageHistory)
-                .build();
     }
     
     @Override
@@ -413,7 +451,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
      * 增加临时消息内容（用于累积流式响应的内容）
      */
     private void appendTempMessage(String sessionId, String content) {
-        String redisKey = AI_CONSULT_SESSION + sessionId + ":temp_message";
+        String redisKey = Constants.RedisKey.AI_CONSULT_SESSION + sessionId + ":temp_message";
         String currentContent = redisService.getValue(redisKey);
         if (currentContent == null) {
             currentContent = "";
@@ -425,7 +463,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
      * 获取临时消息内容
      */
     private String getTempMessage(String sessionId) {
-        String redisKey = AI_CONSULT_SESSION + sessionId + ":temp_message";
+        String redisKey = Constants.RedisKey.AI_CONSULT_SESSION + sessionId + ":temp_message";
         String content = redisService.getValue(redisKey);
         return content != null ? content : "";
     }
@@ -434,7 +472,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
      * 清除临时消息
      */
     private void clearTempMessage(String sessionId) {
-        String redisKey = AI_CONSULT_SESSION + sessionId + ":temp_message";
+        String redisKey = Constants.RedisKey.AI_CONSULT_SESSION + sessionId + ":temp_message";
         redisService.remove(redisKey);
     }
     
@@ -513,6 +551,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
     }
     
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean saveConsultRecord(String sessionId) {
         if (sessionId == null || sessionId.isEmpty()) {
             return false;
@@ -532,49 +571,106 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
             // 处理UUID格式的sessionId转为数字
             Long recordId;
             try {
-                // 尝试移除UUID中的连字符并转为Long
                 recordId = Long.parseLong(sessionId.replaceAll("-", ""), 16);
-                // 取绝对值避免负数，并截断为16位数字
                 recordId = Math.abs(recordId % 10000000000000000L);
             } catch (NumberFormatException e) {
-                // 如果无法解析，使用哈希码
                 recordId = (long) sessionId.hashCode();
                 if (recordId < 0) {
                     recordId = -recordId;
                 }
             }
             
-            // 查询现有记录
-            AiConsultRecord record = getOne(new LambdaQueryWrapper<AiConsultRecord>()
-                    .eq(AiConsultRecord::getRecordId, recordId));
+            // 使用乐观锁更新记录
+            boolean updated = false;
+            int maxRetries = 3;
+            int retryCount = 0;
             
-            if (record == null) {
-                // 创建新记录
-                record = new AiConsultRecord();
-                record.setRecordId(recordId);
-                record.setPatientId(session.getPatientId());
-                record.setAppointmentId(session.getAppointmentId());
-                record.setStatus(session.getStatus());
-                record.setCreateTime(LocalDateTime.now());
+            while (!updated && retryCount < maxRetries) {
+                // 查询现有记录
+                AiConsultRecord record = getOne(new LambdaQueryWrapper<AiConsultRecord>()
+                        .eq(AiConsultRecord::getRecordId, recordId));
+                
+                if (record == null) {
+                    // 创建新记录
+                    record = new AiConsultRecord();
+                    record.setRecordId(recordId);
+                    record.setPatientId(session.getPatientId());
+                    record.setAppointmentId(session.getAppointmentId());
+                    record.setStatus(session.getStatus());
+                    record.setCreateTime(LocalDateTime.now());
+                    record.setVersion(0);
+                }
+                
+                // 更新会话内容和状态
+                record.setConversation(conversationJson);
+                record.setUpdateTime(LocalDateTime.now());
+                
+                // 使用乐观锁更新
+                updated = update(record, new LambdaUpdateWrapper<AiConsultRecord>()
+                        .eq(AiConsultRecord::getRecordId, recordId)
+                        .eq(AiConsultRecord::getVersion, record.getVersion()));
+                
+                if (!updated) {
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        Thread.sleep(100); // 短暂等待后重试
+                    }
+                }
             }
             
-            // 更新会话内容和状态
-            record.setConversation(conversationJson);
-            record.setUpdateTime(LocalDateTime.now());
-            
-            // 保存或更新记录
-            boolean result = saveOrUpdate(record);
-            
-            // 如果成功保存，更新Redis中的会话状态
-            if (result) {
+            if (updated) {
+                // 更新Redis中的会话状态
                 session.setStatus(1); // 标记为已结束
                 saveSessionToRedis(session);
+            } else {
+                log.error("保存会话记录失败: 更新冲突, sessionId: {}", sessionId);
+                return false;
             }
             
-            return result;
+            return true;
         } catch (Exception e) {
             log.error("保存对话记录异常: {}", e.getMessage());
-            return false;
+            throw new RuntimeException("保存对话记录失败", e);
+        }
+    }
+    
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean endConsultSession(String sessionId) {
+        try {
+            // 从Redis获取会话
+            ConsultSession session = getSessionFromRedis(sessionId);
+            if (session == null) {
+                log.warn("结束会话失败: 会话不存在, sessionId: {}", sessionId);
+                return false;
+            }
+            
+            // 更新会话状态
+            session.setStatus(1); // 已结束
+            
+            // 保存到Redis
+            saveSessionToRedis(session);
+            
+            // 保存到数据库（带事务）
+            boolean saved = saveConsultRecord(sessionId);
+            
+            if (saved) {
+                // 关闭SSE连接
+                SseEmitter emitter = sseEmitterMap.remove(sessionId);
+                if (emitter != null) {
+                    emitter.complete();
+                }
+            } else {
+                // 如果保存失败，回滚Redis中的状态
+                session.setStatus(0);
+                saveSessionToRedis(session);
+                throw new RuntimeException("保存会话记录失败");
+            }
+            
+            return true;
+        } catch (Exception e) {
+            log.error("结束对话会话异常: {}", e.getMessage());
+            throw new RuntimeException("结束会话失败", e);
         }
     }
     
@@ -633,40 +729,6 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
         } catch (Exception e) {
             log.error("获取对话会话异常: {}", e.getMessage());
             return null;
-        }
-    }
-    
-    @Override
-    public boolean endConsultSession(String sessionId) {
-        try {
-            // 从Redis获取会话
-            ConsultSession session = getSessionFromRedis(sessionId);
-            if (session == null) {
-                log.warn("结束会话失败: 会话不存在, sessionId: {}", sessionId);
-                return false;
-            }
-            
-            // 更新会话状态
-            session.setStatus(1); // 已结束
-            
-            // 保存到Redis
-            saveSessionToRedis(session);
-            
-            // 保存到数据库
-            boolean saved = saveConsultRecord(sessionId);
-            
-            // 关闭SSE连接
-            if (saved) {
-                SseEmitter emitter = sseEmitterMap.remove(sessionId);
-                if (emitter != null) {
-                    emitter.complete();
-                }
-            }
-            
-            return saved;
-        } catch (Exception e) {
-            log.error("结束对话会话异常: {}", e.getMessage());
-            return false;
         }
     }
 }

@@ -3,6 +3,7 @@ package com.graduation.his.domain.po;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.Version;
 import java.time.LocalDateTime;
 import java.io.Serializable;
 import lombok.Data;
@@ -28,7 +29,7 @@ public class AiConsultRecord implements Serializable {
     /**
      * 问诊记录ID
      */
-    @TableId(value = "record_id", type = IdType.AUTO)
+    @TableId(value = "record_id", type = IdType.INPUT)
     private Long recordId;
 
     /**
@@ -50,6 +51,12 @@ public class AiConsultRecord implements Serializable {
      * 问诊状态(0-进行中,1-已结束)
      */
     private Integer status;
+
+    /**
+     * 版本号，用于乐观锁
+     */
+    @Version
+    private Integer version;
 
     /**
      * 创建时间
