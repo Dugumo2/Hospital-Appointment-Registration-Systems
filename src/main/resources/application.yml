@@ -1,0 +1,79 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://1.95.79.29:3306/hospital?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
+    username: root
+    password: 279110233
+  servlet:
+    multipart:
+      # 单文件最大上传大小
+      max-file-size: 1000MB
+      # 单请求，多文件上传大小
+      max-request-size: 3000MB
+  mail:
+    host: smtp.qq.com
+    username: 1309021068@qq.com
+    password: cwzidmpyrclhjbcc
+    port: 465
+    default-encoding: UTF-8
+    protocol: smtps
+    nickname: 医院门诊系统
+    properties:
+      "mail.smtp.auth": true                # 必须开启，验证身份
+      "mail.smtp.starttls.enable": true     # 建议开启，确保传输安全
+      "mail.smtp.timeout": 5000             # 建议设置，避免发送超时
+  data:
+    redis:
+      host: 1.95.79.29
+      port: 6379
+      password: 123321
+      database: 0
+      lettuce:
+        pool:
+          max-active: 8  #最大连接
+          max-idle: 8   #最大空闲连接
+          min-idle: 0   #最小空闲连接
+          max-wait: 100ms #连接等待时间
+
+
+# sa-token配置
+sa-token:
+  # token 名称（同时也是 cookie 名称）
+  token-name: sa-token-authorization
+  # token 有效期（单位：秒） 默认30天，-1 代表永久有效
+  timeout: 3600
+  # token 最低活跃频率（单位：秒），如果 token 超过此时间没有访问系统就会被冻结，默认-1 代表不限制，永不冻结
+  active-timeout: 1800
+  # 是否允许同一账号多地同时登录 （为 true 时允许一起登录, 为 false 时新登录挤掉旧登录）
+  is-concurrent: false
+  # 在多人登录同一账号时，是否共用一个 token （为 true 时所有登录共用一个 token, 为 false 时每次登录新建一个 token）
+  is-share: true
+  # token 风格（默认可取值：uuid、simple-uuid、random-32、random-64、random-128、tik）
+  token-style: simple-uuid
+  # 是否输出操作日志
+  is-log: true
+  # 是否开启token自动续期
+  auto-renew: true
+
+mybatis-plus:
+  type-aliases-package: com.graduation.his.domain.po
+  global-config:
+    db-config:
+      id-type: auto # 全局id类型为自增长
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+
+
+logging:
+  level:
+    org.ehcache: debug
+
+
+#aliyun:
+#  oss:
+#    endpoint: https://oss-cn-hangzhou.aliyuncs.com
+#    accessKeyId: LTAI4GCH1vX6DKqJWxd6nEuW
+#    accessKeySecret: yBshYweHOpqDuhCArrVHwIiBKpyqSL
+#    bucketName: web-397
