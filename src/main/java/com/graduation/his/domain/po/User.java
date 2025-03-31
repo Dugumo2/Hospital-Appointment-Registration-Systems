@@ -1,8 +1,6 @@
 package com.graduation.his.domain.po;
 
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.*;
 import java.time.LocalDateTime;
 import java.io.Serializable;
 import lombok.Data;
@@ -80,6 +78,5 @@ public class User implements Serializable {
      * 更新时间
      */
     private LocalDateTime updateTime;
-
 
 }
