@@ -193,10 +193,23 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
     }
     
     @Override
-    public SseEmitter createSseConnection(String sessionId) {
+    public SseEmitter createSseConnection(AiConsultConnectionRequest request) {
+        // 验证必要参数
+        if (request.getPatientId() == null) {
+            throw new IllegalArgumentException("患者ID不能为空");
+        }
+        if (request.getAppointmentId() == null) {
+            throw new IllegalArgumentException("预约ID不能为空");
+        }
+        
+        String sessionId = request.getSessionId();
+        Long patientId = request.getPatientId();
+        boolean isNewSession = false;
+        
         // 如果sessionId为空，创建新的会话ID
         if (sessionId == null || sessionId.isEmpty()) {
             sessionId = UUID.randomUUID().toString();
+            isNewSession = true;
         }
         
         // 创建SSE发射器，设置30分钟超时
@@ -234,6 +247,48 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
         // 将SSE发射器添加到映射中
         sseEmitterMap.put(sessionId, emitter);
         
+        // 如果是新会话，则在Redis中初始化一个完整会话，确保后续操作能找到会话
+        if (isNewSession) {
+            // 创建完整会话并保存到Redis
+            ConsultSession session = ConsultSession.builder()
+                    .sessionId(sessionId)
+                    .patientId(patientId)
+                    .appointmentId(request.getAppointmentId())
+                    .status(0) // 进行中
+                    .version(0) // 初始化版本号
+                    .messageHistory(new ArrayList<>())
+                    .build();
+            
+            // 添加系统消息
+            MessageRecord systemMessage = MessageRecord.builder()
+                    .role("system")
+                    .content(createSystemPrompt())
+                    .createTime(LocalDateTime.now())
+                    .build();
+            session.getMessageHistory().add(systemMessage);
+            
+            // 保存到Redis
+            saveSessionToRedis(session);
+        } else {
+            // 如果使用现有会话ID，验证会话是否存在并检查关联的患者ID和预约ID
+            ConsultSession existingSession = getSessionFromRedis(sessionId);
+            if (existingSession == null) {
+                existingSession = getConsultSession(sessionId);
+            }
+            
+            if (existingSession == null) {
+                throw new IllegalArgumentException("无效的会话ID");
+            }
+            
+            // 验证会话关联的患者ID和预约ID是否匹配
+            if (!patientId.equals(existingSession.getPatientId())) {
+                throw new IllegalArgumentException("会话关联的患者ID与当前用户不匹配");
+            }
+            if (!request.getAppointmentId().equals(existingSession.getAppointmentId())) {
+                throw new IllegalArgumentException("会话关联的预约ID与请求不匹配");
+            }
+        }
+        
         // 发送连接成功事件
         try {
             emitter.send(SseEmitter.event()
@@ -254,11 +309,18 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
     public String processAiConsult(AiConsultRequest request) {
         String sessionId = request.getSessionId();
         Long patientId = request.getPatientId();
+        Long appointmentId = request.getAppointmentId();
         String question = request.getQuestion();
         
         // 验证必要参数
-        if (patientId == null || question == null || question.trim().isEmpty()) {
-            throw new IllegalArgumentException("患者ID和问题内容不能为空");
+        if (patientId == null) {
+            throw new IllegalArgumentException("患者ID不能为空");
+        }
+        if (appointmentId == null) {
+            throw new IllegalArgumentException("预约ID不能为空");
+        }
+        if (question == null || question.trim().isEmpty()) {
+            throw new IllegalArgumentException("问题内容不能为空");
         }
         
         // 获取或创建会话
@@ -270,8 +332,9 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
             session = ConsultSession.builder()
                     .sessionId(sessionId)
                     .patientId(patientId)
-                    .appointmentId(request.getAppointmentId())
+                    .appointmentId(appointmentId)
                     .status(0) // 进行中
+                    .version(0) // 初始化版本号
                     .messageHistory(new ArrayList<>())
                     .build();
             
@@ -292,8 +355,21 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
                     throw new IllegalArgumentException("无效的会话ID");
                 }
             }
+            
+            // 验证会话关联的患者ID和预约ID是否匹配
+            if (!patientId.equals(session.getPatientId())) {
+                throw new IllegalArgumentException("会话关联的患者ID与请求不匹配");
+            }
+            if (!appointmentId.equals(session.getAppointmentId())) {
+                throw new IllegalArgumentException("会话关联的预约ID与请求不匹配");
+            }
         }
-        
+
+        // 确保version不为null
+        if (session.getVersion() == null) {
+            session.setVersion(0);
+        }
+
         // 添加用户消息
         MessageRecord userMessage = MessageRecord.builder()
                 .role("user")
@@ -720,6 +796,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
                     .appointmentId(record.getAppointmentId())
                     .status(record.getStatus())
                     .messageHistory(messageHistory)
+                    .version(record.getVersion())
                     .build();
             
             // 将会话缓存到Redis

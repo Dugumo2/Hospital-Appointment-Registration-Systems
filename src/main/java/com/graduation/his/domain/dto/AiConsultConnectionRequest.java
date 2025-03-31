@@ -6,30 +6,26 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * AI问诊请求DTO，用于接收前端的问诊请求
+ * AI问诊连接请求DTO
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AiConsultRequest {
-    /**
-     * 患者ID
-     */
-    private Long patientId;
+public class AiConsultConnectionRequest {
     
     /**
-     * 会话ID，首次对话为空
+     * 会话ID，首次对话为null
      */
     private String sessionId;
     
     /**
-     * 预约ID
+     * 预约ID，必填
      */
     private Long appointmentId;
     
     /**
-     * 用户问题内容
+     * 患者ID，必填
      */
-    private String question;
+    private Long patientId;
 } 

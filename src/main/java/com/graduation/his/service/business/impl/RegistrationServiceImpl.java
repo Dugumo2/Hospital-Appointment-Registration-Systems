@@ -1,5 +1,6 @@
 package com.graduation.his.service.business.impl;
 
+import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
 import com.graduation.his.service.business.IRegistrationService;
@@ -22,9 +23,20 @@ public class RegistrationServiceImpl implements IRegistrationService {
     private IAIService aiService;
     
     @Override
-    public SseEmitter createAiConsultConnection(String sessionId) {
-        log.info("创建AI问诊SSE连接, sessionId: {}", sessionId);
-        return aiService.createSseConnection(sessionId);
+    public SseEmitter createAiConsultConnection(AiConsultConnectionRequest request) {
+        log.info("创建AI问诊SSE连接, appointmentId: {}, patientId: {}, sessionId: {}", 
+                request.getAppointmentId(), request.getPatientId(), request.getSessionId());
+        
+        // 验证参数
+        if (request.getAppointmentId() == null) {
+            throw new IllegalArgumentException("预约ID不能为空");
+        }
+        if (request.getPatientId() == null) {
+            throw new IllegalArgumentException("患者ID不能为空");
+        }
+        
+        // 调用AI服务创建连接
+        return aiService.createSseConnection(request);
     }
     
     @Override

@@ -1,5 +1,6 @@
 package com.graduation.his.service.business;
 
+import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -13,10 +14,10 @@ public interface IRegistrationService {
     
     /**
      * 创建AI问诊SSE连接
-     * @param sessionId 会话ID，首次对话为null
+     * @param request 连接请求(包含会话ID、预约ID和患者ID)
      * @return SSE连接对象
      */
-    SseEmitter createAiConsultConnection(String sessionId);
+    SseEmitter createAiConsultConnection(AiConsultConnectionRequest request);
     
     /**
      * 发送AI问诊请求
