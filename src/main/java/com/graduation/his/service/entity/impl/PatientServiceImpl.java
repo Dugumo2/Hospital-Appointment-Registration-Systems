@@ -1,5 +1,6 @@
 package com.graduation.his.service.entity.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.graduation.his.domain.po.Patient;
 import com.graduation.his.mapper.PatientMapper;
 import com.graduation.his.service.entity.IPatientService;
@@ -17,4 +18,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class PatientServiceImpl extends ServiceImpl<PatientMapper, Patient> implements IPatientService {
 
+    @Override
+    public Patient getByUserId(Long userId) {
+        return getOne(new LambdaQueryWrapper<Patient>()
+                .eq(Patient::getUserId, userId)
+                .last("LIMIT 1"));
+    }
 }

@@ -1,6 +1,7 @@
 package com.graduation.his.service.entity;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
 import com.graduation.his.domain.po.AiConsultRecord;
@@ -18,10 +19,10 @@ public interface IAIService extends IService<AiConsultRecord> {
 
     /**
      * 创建SSE连接，用于流式输出AI回答
-     * @param sessionId 会话ID，首次对话为null
+     * @param request 连接请求(包含会话ID、预约ID和患者ID)
      * @return SseEmitter对象
      */
-    SseEmitter createSseConnection(String sessionId);
+    SseEmitter createSseConnection(AiConsultConnectionRequest request);
     
     /**
      * 处理AI问诊请求，并通过SSE流式返回结果

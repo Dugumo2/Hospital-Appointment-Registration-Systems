@@ -11,50 +11,50 @@ import lombok.experimental.Accessors;
 
 /**
  * <p>
- * 医生信息表
+ * 医院科室表
  * </p>
  *
  * @author hua
- * @since 2025-03-30
+ * @since 2025-04-02
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("doctor")
-public class Doctor implements Serializable {
+@TableName("department")
+public class Department implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * 医生ID
-     */
-    @TableId(value = "doctor_id", type = IdType.AUTO)
-    private Long doctorId;
-
-    /**
-     * 关联用户ID
-     */
-    private Long userId;
-
-    /**
-     * 医生姓名
-     */
-    private String name;
-
-    /**
      * 科室ID
      */
-    private Integer deptId;
+    @TableId(value = "dept_id", type = IdType.AUTO)
+    private Long deptId;
 
     /**
-     * 职称(主任医师,副主任医师等)
+     * 科室名称
      */
-    private String title;
+    private String deptName;
 
     /**
-     * 医生简介
+     * 科室编码
      */
-    private String introduction;
+    private String deptCode;
+
+    /**
+     * 科室类型(0-内科,1-外科,2-妇产科,3-儿科,4-五官科,5-其他)
+     */
+    private Integer deptType;
+
+    /**
+     * 科室描述
+     */
+    private String description;
+
+    /**
+     * 是否有效(0-无效,1-有效)
+     */
+    private Integer isActive;
 
     /**
      * 创建时间

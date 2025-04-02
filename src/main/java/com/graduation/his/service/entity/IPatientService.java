@@ -13,4 +13,10 @@ import com.graduation.his.domain.po.Patient;
  */
 public interface IPatientService extends IService<Patient> {
 
+    /**
+     * 根据用户ID查询患者
+     * @param userId 用户ID
+     * @return 患者对象
+     */
+    Patient getByUserId(Long userId);
 }

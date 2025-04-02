@@ -1,8 +1,6 @@
 package com.graduation.his.domain.po;
 
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.*;
 import java.time.LocalDateTime;
 import java.io.Serializable;
 import lombok.Data;
@@ -57,16 +55,6 @@ public class User implements Serializable {
     private Integer role;
 
     /**
-     * 第三方登录唯一标识
-     */
-    private String openId;
-
-    /**
-     * 第三方登录类型(qq,weixin等)
-     */
-    private String authType;
-
-    /**
      * 用户头像URL
      */
     private String avatar;
@@ -80,6 +68,5 @@ public class User implements Serializable {
      * 更新时间
      */
     private LocalDateTime updateTime;
-
 
 }

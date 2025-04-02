@@ -78,5 +78,4 @@ ai-service:
 #  oss:
 #    endpoint: https://oss-cn-hangzhou.aliyuncs.com
 #    accessKeyId: LTAI4GCH1vX6DKqJWxd6nEuW
-#    accessKeySecret: yBshYweHOpqDuhCArrVHwIiBKpyqSL
-#    bucketName: web-397
+#    accessKeySecret: yBshYweHOpqDuhCArrVHwIiBKpyqSL#    bucketName: web-397
