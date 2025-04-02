@@ -244,7 +244,13 @@ public class AuthServiceImpl implements IAuthService {
             throw new BusinessException("不支持的平台");
         }
         
-        return authRequest.authorize(UUID.randomUUID().toString());
+        // 生成state参数，用于防止CSRF攻击
+        String state = UUID.randomUUID().toString();
+        // 保存state到Redis，设置5分钟过期
+        String stateKey = "auth:state:" + state;
+        redisService.setValue(stateKey, state, TimeUnit.MINUTES.toMillis(5));
+        
+        return authRequest.authorize(state);
     }
     
     @Override
@@ -258,6 +264,17 @@ public class AuthServiceImpl implements IAuthService {
         if (authRequest == null) {
             throw new BusinessException("不支持的平台");
         }
+        
+        // 验证state参数，防止CSRF攻击
+        String state = callback.getState();
+        String stateKey = "auth:state:" + state;
+        String savedState = redisService.getValue(stateKey);
+        if (savedState == null || !savedState.equals(state)) {
+            log.error("第三方登录state验证失败");
+            return "/login?error=登录验证失败，请重试";
+        }
+        // 删除state
+        redisService.remove(stateKey);
         
         // 获取第三方用户信息
         AuthResponse<AuthUser> response = authRequest.login(callback);
@@ -275,8 +292,13 @@ public class AuthServiceImpl implements IAuthService {
             // 已关联用户，直接登录
             StpUtil.login(user.getId());
             
-            // 更新最后登录时间
+            // 更新最后登录时间和用户头像(如果有)
             user.setUpdateTime(LocalDateTime.now());
+            // 如果第三方有新的头像，更新用户头像
+            if (StringUtils.isNotBlank(authUser.getAvatar()) && 
+                !authUser.getAvatar().equals(user.getAvatar())) {
+                user.setAvatar(authUser.getAvatar());
+            }
             userService.updateById(user);
             
             return "/";
@@ -287,13 +309,17 @@ public class AuthServiceImpl implements IAuthService {
             
             // 保存第三方用户信息到Redis
             ThirdPartyLoginInfoDTO infoDTO = ThirdPartyLoginInfoDTO.builder()
-                    .thirdPartyUserId(authUser.getUuid())
+                    .openId(authUser.getUuid())
                     .platform(platform)
                     .email(authUser.getEmail())
+                    .name(authUser.getNickname())
+                    .avatar(authUser.getAvatar())
+                    .accessToken(authUser.getToken().getAccessToken())
+                    .refreshToken(authUser.getToken().getRefreshToken())
                     .build();
             
             String infoJson = com.alibaba.fastjson2.JSON.toJSONString(infoDTO);
-            redisService.setValue(key, infoJson, TimeUnit.HOURS.toMillis(1));
+            redisService.setValue(key, infoJson, TimeUnit.HOURS.toMillis(THIRD_PARTY_LOGIN_EXPIRE_HOURS));
             
             // 构建重定向URL
             String redirectUrl = "/third-party-register?token=" + token;
@@ -330,7 +356,7 @@ public class AuthServiceImpl implements IAuthService {
         
         // 解析Redis中的信息
         ThirdPartyLoginInfoDTO storedInfo = com.alibaba.fastjson2.JSON.parseObject(value, ThirdPartyLoginInfoDTO.class);
-        String thirdPartyUserId = storedInfo.getThirdPartyUserId();
+        String openId = storedInfo.getOpenId();
         String platform = storedInfo.getPlatform();
         
         // 删除Redis中的临时信息
@@ -341,15 +367,22 @@ public class AuthServiceImpl implements IAuthService {
             throw new BusinessException("姓名不能为空");
         }
         
+        // 生成唯一用户名
+        String username = generateUniqueUsername(loginInfoDTO.getName(), platform);
+        
         // 保存用户信息
         User user = new User();
-        user.setUsername(loginInfoDTO.getName() + "_" + platform + "_" + System.currentTimeMillis());
+        user.setUsername(username);
         user.setPassword(DigestUtils.md5Hex(UUID.randomUUID().toString() + Constants.SALT)); // 随机密码
         user.setEmail(loginInfoDTO.getEmail());
         user.setPhone(loginInfoDTO.getPhone());
         user.setRole(0); // 0-患者
-        user.setOpenId(thirdPartyUserId);
+        user.setOpenId(openId);
         user.setAuthType(platform);
+        // 设置头像，优先使用第三方头像
+        if (StringUtils.isNotBlank(storedInfo.getAvatar())) {
+            user.setAvatar(storedInfo.getAvatar());
+        }
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
         userService.save(user);
@@ -432,5 +465,102 @@ public class AuthServiceImpl implements IAuthService {
         userVO.setUpdateTime(user.getUpdateTime());
         
         return userVO;
+    }
+    
+    /**
+     * 生成唯一的用户名
+     * 格式：name_平台_6位随机字符
+     * @param name 用户姓名或昵称
+     * @param platform 平台类型
+     * @return 唯一用户名
+     */
+    private String generateUniqueUsername(String name, String platform) {
+        // 移除名称中的特殊字符，只保留字母、数字和下划线
+        String safeName = name.replaceAll("[^a-zA-Z0-9_]", "");
+        if (StringUtils.isBlank(safeName)) {
+            safeName = "user"; // 如果名称清理后为空，使用默认名称
+        }
+        
+        // 生成6位随机字符串
+        String randomStr = UUID.randomUUID().toString().substring(0, 6);
+        String username = safeName + "_" + platform + "_" + randomStr;
+        
+        // 确保用户名唯一
+        int suffix = 1;
+        String tempUsername = username;
+        while (userService.getByUsername(tempUsername) != null) {
+            tempUsername = username + suffix;
+            suffix++;
+        }
+        
+        return tempUsername;
+    }
+    
+    /**
+     * 更新第三方登录的accessToken
+     * 根据OAuth2.0规范，当access_token过期时可以使用refresh_token获取新的access_token
+     * @param platform 平台类型
+     * @param userId 用户ID
+     * @param refreshToken 刷新令牌
+     * @return 是否更新成功
+     */
+    private boolean refreshAccessToken(String platform, Long userId, String refreshToken) {
+        if (StringUtils.isBlank(platform) || userId == null || StringUtils.isBlank(refreshToken)) {
+            return false;
+        }
+        
+        AuthRequest authRequest = authRequestMap.get(platform.toLowerCase());
+        if (authRequest == null) {
+            return false;
+        }
+        
+        try {
+            // 创建AuthToken对象
+            me.zhyd.oauth.model.AuthToken authToken = new me.zhyd.oauth.model.AuthToken();
+            authToken.setRefreshToken(refreshToken);
+            
+            // 调用第三方平台刷新token接口
+            AuthResponse<?> response = authRequest.refresh(authToken);
+            if (response.getCode() == 2000) {
+                // 刷新成功，更新用户的token信息
+                Object data = response.getData();
+                if (data != null && data instanceof me.zhyd.oauth.model.AuthToken) {
+                    me.zhyd.oauth.model.AuthToken newAuthToken = (me.zhyd.oauth.model.AuthToken) data;
+                    
+                    // 在实际应用中，可以将新的token信息存储到数据库或Redis中
+                    // 这里只是记录日志
+                    log.info("用户[{}]的{}平台token已刷新", userId, platform);
+                    return true;
+                }
+            } else {
+                log.error("刷新{}平台token失败: {}", platform, response.getMsg());
+            }
+        } catch (Exception e) {
+            log.error("刷新{}平台token异常: {}", platform, e.getMessage());
+        }
+        
+        return false;
+    }
+
+    /**
+     * 验证第三方登录token是否有效
+     * @param platform 平台类型
+     * @param accessToken 访问令牌
+     * @return 是否有效
+     */
+    private boolean validateAccessToken(String platform, String accessToken) {
+        if (StringUtils.isBlank(platform) || StringUtils.isBlank(accessToken)) {
+            return false;
+        }
+        
+        if (platform.equalsIgnoreCase("qq")) {
+            // 对于QQ登录，可以通过调用OpenAPI来验证token是否有效
+            // 实际项目中可以调用QQ的OpenAPI进行验证
+            // 这里简单返回true，假设token有效
+            return true;
+        }
+        
+        // 对于其他平台，可以实现对应的验证逻辑
+        return true;
     }
 }

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * 第三方登录补充信息DTO
+ * QQ登录采用OAuth2.0的Authorization Code模式
  */
 @Data
 @Builder
@@ -20,9 +21,19 @@ public class ThirdPartyLoginInfoDTO {
     private String thirdPartyToken;
     
     /**
-     * 第三方平台用户ID
+     * QQ登录的Access Token
      */
-    private String thirdPartyUserId;
+    private String accessToken;
+    
+    /**
+     * QQ登录的Refresh Token
+     */
+    private String refreshToken;
+    
+    /**
+     * QQ登录的OpenID
+     */
+    private String openId;
     
     /**
      * 第三方平台类型（qq、weixin等）
@@ -68,4 +79,9 @@ public class ThirdPartyLoginInfoDTO {
      * 详细住址
      */
     private String address;
+    
+    /**
+     * 头像URL
+     */
+    private String avatar;
 } 

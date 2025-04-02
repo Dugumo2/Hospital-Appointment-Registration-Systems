@@ -73,10 +73,15 @@ logging:
 ai-service:
   api-url: https://api.deepseek.com
   api-key: sk-9487d59d27ce471091b8a7ab03d5d5ac
+# 第三方登录
+oauth:
+  qq:
+    app-id: 102748802
+    app-key: ELFxa7XlndJm37zg
+    redirect-uri: http://127.0.0.1:8080/api/auth/thirdParty/callback/qq
 
 #aliyun:
 #  oss:
 #    endpoint: https://oss-cn-hangzhou.aliyuncs.com
 #    accessKeyId: LTAI4GCH1vX6DKqJWxd6nEuW
-#    accessKeySecret: yBshYweHOpqDuhCArrVHwIiBKpyqSL
-#    bucketName: web-397
+#    accessKeySecret: yBshYweHOpqDuhCArrVHwIiBKpyqSL#    bucketName: web-397
