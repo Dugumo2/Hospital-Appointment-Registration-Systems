@@ -92,7 +92,7 @@ public class UserVO {
     private LocalDateTime updateTime;
     
     /**
-     * 第三方登录令牌（临时使用）
+     * 用户登录令牌
      */
-    private String thirdPartyToken;
+    private String token;
 } 

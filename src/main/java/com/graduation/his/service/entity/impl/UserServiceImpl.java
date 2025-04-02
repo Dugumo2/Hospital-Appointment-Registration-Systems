@@ -31,12 +31,4 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
                 .eq(User::getEmail, email)
                 .last("LIMIT 1"));
     }
-
-    @Override
-    public User getByThirdParty(String platformId, String platformType) {
-        return getOne(new LambdaQueryWrapper<User>()
-                .eq(User::getOpenId, platformId)
-                .eq(User::getAuthType, platformType)
-                .last("LIMIT 1"));
-    }
 }

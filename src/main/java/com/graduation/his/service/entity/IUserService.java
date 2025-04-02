@@ -26,12 +26,4 @@ public interface IUserService extends IService<User> {
      * @return 用户对象
      */
     User getByEmail(String email);
-
-    /**
-     * 根据第三方平台ID和类型查询用户
-     * @param platformId 平台ID
-     * @param platformType 平台类型
-     * @return 用户对象
-     */
-    User getByThirdParty(String platformId, String platformType);
 }
