@@ -19,7 +19,7 @@ public class WebConfig implements WebMvcConfigurer {
         // 注册Sa-Token的路由拦截器，负责Token校验和自动续期
         registry.addInterceptor(new SaInterceptor())
                 .addPathPatterns("/**")
-                .excludePathPatterns("/auth/register", "/auth/login", "/auth/email", "/auth/IsExists");
+                .excludePathPatterns("/auth/register", "/auth/login", "/auth/email", "/auth/IsExists", "/admin/schedule/auto");
 
        //注册自定义拦截器对象
         registry.addInterceptor(loginCheckInterceptor)
@@ -27,6 +27,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns("/auth/register")
                 .excludePathPatterns("/auth/login")
                 .excludePathPatterns("/auth/email")
-                .excludePathPatterns("/auth/IsExists");
+                .excludePathPatterns("/auth/IsExists")
+                .excludePathPatterns("/admin/schedule/auto");
     }
 }

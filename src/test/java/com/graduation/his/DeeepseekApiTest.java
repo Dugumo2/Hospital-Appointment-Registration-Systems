@@ -33,8 +33,8 @@ import java.util.concurrent.atomic.AtomicReference;
 public class DeeepseekApiTest {
 
     public static void main(String[] args) {
-//        testMultiRoundConversation();
-        testMultiRoundConversationByFlux();
+        testMultiRoundConversation();
+//        testMultiRoundConversationByFlux();
     }
 
     public static void testMultiRoundConversation() {

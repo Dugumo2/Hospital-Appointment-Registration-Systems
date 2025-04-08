@@ -16,7 +16,7 @@ import lombok.experimental.Accessors;
  * </p>
  *
  * @author hua
- * @since 2025-03-30
+ * @since 2025-04-04
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
@@ -38,6 +38,11 @@ public class Schedule implements Serializable {
     private Long doctorId;
 
     /**
+     * 门诊ID
+     */
+    private Long clinicId;
+
+    /**
      * 排班日期
      */
     private LocalDate scheduleDate;
@@ -51,6 +56,11 @@ public class Schedule implements Serializable {
      * 该时段可挂号最大人数
      */
     private Integer maxPatients;
+
+    /**
+     * 当前已预约人数
+     */
+    private Integer currentPatients;
 
     /**
      * 排班状态(0-无效,1-有效)

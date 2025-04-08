@@ -1,9 +1,9 @@
 package com.graduation.his.service.entity.impl;
 
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.graduation.his.domain.po.Appointment;
 import com.graduation.his.mapper.AppointmentMapper;
 import com.graduation.his.service.entity.IAppointmentService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 /**

@@ -45,12 +45,22 @@ public class AppointmentVO {
     /**
      * 科室ID
      */
-    private Integer deptId;
+    private Long deptId;
     
     /**
      * 科室名称
      */
     private String deptName;
+    
+    /**
+     * 门诊ID
+     */
+    private Long clinicId;
+    
+    /**
+     * 门诊名称
+     */
+    private String clinicName;
     
     /**
      * 排班ID
@@ -66,6 +76,11 @@ public class AppointmentVO {
      * 预约时间段
      */
     private String timeSlot;
+    
+    /**
+     * 是否为复诊(0-初诊,1-复诊)
+     */
+    private Integer isRevisit;
     
     /**
      * 预约状态(0-待就诊,1-已就诊,2-已取消等)

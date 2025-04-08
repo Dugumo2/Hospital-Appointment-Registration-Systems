@@ -11,50 +11,40 @@ import lombok.experimental.Accessors;
 
 /**
  * <p>
- * 复诊邀请表
+ * 门诊表
  * </p>
  *
  * @author hua
- * @since 2025-03-30
+ * @since 2025-04-04
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("reinvitation")
-public class Reinvitation implements Serializable {
+@TableName("clinic")
+public class Clinic implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * 邀请ID
+     * 门诊ID
      */
-    @TableId(value = "invite_id", type = IdType.AUTO)
-    private Long inviteId;
+    @TableId(value = "clinic_id", type = IdType.AUTO)
+    private Long clinicId;
 
     /**
-     * 关联的诊断记录ID
+     * 所属科室ID
      */
-    private Long diagId;
+    private Long deptId;
 
     /**
-     * 医生ID
+     * 门诊名称
      */
-    private Long doctorId;
+    private String clinicName;
 
     /**
-     * 患者ID
+     * 是否有效(0-无效,1-有效)
      */
-    private Long patientId;
-
-    /**
-     * 邀请消息
-     */
-    private String message;
-
-    /**
-     * 状态(0-未处理,1-已接受,2-已拒绝)
-     */
-    private Integer status;
+    private Integer isActive;
 
     /**
      * 创建时间

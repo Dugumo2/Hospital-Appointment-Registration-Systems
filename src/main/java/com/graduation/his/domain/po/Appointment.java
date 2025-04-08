@@ -15,8 +15,8 @@ import lombok.experimental.Accessors;
  * 预约挂号表
  * </p>
  *
- * @author hua
- * @since 2025-03-30
+ * @author feng
+ * @since 2025-04-07
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
@@ -56,6 +56,11 @@ public class Appointment implements Serializable {
      * 预约时间段
      */
     private String timeSlot;
+
+    /**
+     * 是否为复诊(0-初诊,1-复诊)
+     */
+    private Integer isRevisit;
 
     /**
      * 预约状态(0-待就诊,1-已就诊,2-已取消等)

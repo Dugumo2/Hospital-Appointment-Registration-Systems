@@ -1,7 +1,8 @@
 package com.graduation.his.mapper;
 
-import com.graduation.his.domain.po.Department;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.graduation.his.domain.po.Department;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
  * <p>
@@ -11,6 +12,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
  * @author hua
  * @since 2025-04-02
  */
+@Mapper
 public interface DepartmentMapper extends BaseMapper<Department> {
 
 }

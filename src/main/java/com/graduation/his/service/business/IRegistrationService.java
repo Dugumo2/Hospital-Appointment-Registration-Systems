@@ -4,8 +4,16 @@ import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
 import com.graduation.his.domain.po.Appointment;
+import com.graduation.his.domain.po.Clinic;
+import com.graduation.his.domain.po.Department;
 import com.graduation.his.domain.po.Doctor;
+import com.graduation.his.domain.po.Patient;
 import com.graduation.his.domain.po.Schedule;
+import com.graduation.his.domain.query.ScheduleQuery;
+import com.graduation.his.domain.vo.AppointmentVO;
+import com.graduation.his.domain.vo.DoctorVO;
+import com.graduation.his.domain.vo.ScheduleDetailVO;
+import com.graduation.his.domain.vo.ScheduleListVO;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDate;
@@ -48,35 +56,39 @@ public interface IRegistrationService {
     ConsultSession getAiConsultHistory(String sessionId);
     
     /**
-     * 获取医生列表，可按科室ID筛选
-     * @param deptId 科室ID，可为null表示获取所有医生
-     * @return 医生列表
+     * 获取排班列表视图对象
+     * @param query 排班查询条件，包含deptId、clinicId、doctorId、title、startDate和endDate等参数
+     * @return 排班列表VO
      */
-    List<Doctor> getDoctorList(Long deptId);
+    List<ScheduleListVO> getScheduleListVO(ScheduleQuery query);
     
     /**
-     * 获取医生详情
-     * @param doctorId 医生ID
-     * @return 医生详情
+     * 获取排班详情
+     * @param scheduleId 排班ID
+     * @param patientId 患者ID (可选，传入则会填充患者信息)
+     * @return 排班详情VO
      */
-    Doctor getDoctorDetail(Long doctorId);
+    ScheduleDetailVO getScheduleDetail(Long scheduleId, Long patientId);
     
     /**
-     * 获取指定日期范围内医生的排班信息
-     * @param doctorId 医生ID
-     * @param startDate 开始日期
-     * @param endDate 结束日期
-     * @return 日期到排班列表的映射
+     * 获取排班列表
+     * @param deptId 科室ID (可选)
+     * @param clinicId 门诊ID (可选)
+     * @param doctorId 医生ID (可选)
+     * @param startDate 开始日期 (可选，默认今天)
+     * @param endDate 结束日期 (可选，默认开始日期后7天)
+     * @return 排班列表
      */
-    Map<LocalDate, List<Schedule>> getDoctorSchedule(Long doctorId, LocalDate startDate, LocalDate endDate);
+    List<Schedule> getScheduleList(Long deptId, Long clinicId, Long doctorId, LocalDate startDate, LocalDate endDate);
     
     /**
      * 创建预约挂号
      * @param patientId 患者ID
      * @param scheduleId 排班ID
+     * @param isRevisit 是否为复诊(0-初诊,1-复诊)
      * @return 预约记录
      */
-    Appointment createAppointment(Long patientId, Long scheduleId);
+    Appointment createAppointment(Long patientId, Long scheduleId, Integer isRevisit);
     
     /**
      * 取消预约挂号
@@ -102,4 +114,68 @@ public interface IRegistrationService {
      * @return 预约记录列表
      */
     List<Appointment> getDoctorAppointments(Long doctorId, LocalDate date, Integer status);
+    
+    /**
+     * 获取科室列表
+     * @param onlyActive 是否只返回有效科室
+     * @return 科室列表
+     */
+    List<Department> getDepartmentList(boolean onlyActive);
+    
+    /**
+     * 获取门诊列表
+     * @param deptId 科室ID (可选)
+     * @param onlyActive 是否只返回有效门诊
+     * @return 门诊列表
+     */
+    List<Clinic> getClinicList(Long deptId, boolean onlyActive);
+    
+    /**
+     * 根据用户ID获取患者信息
+     * @param userId 用户ID
+     * @return 患者信息
+     */
+    Patient getPatientByUserId(Long userId);
+    
+    /**
+     * 获取医生列表VO
+     * @param deptId 科室ID (可选)
+     * @param name 医生姓名 (可选，模糊匹配)
+     * @param clinicId 门诊ID (可选)
+     * @return 医生VO列表
+     */
+    List<DoctorVO> getDoctorListVO(Long deptId, String name, Long clinicId);
+    
+    /**
+     * 获取医生详情VO
+     * @param doctorId 医生ID
+     * @return 医生VO
+     */
+    DoctorVO getDoctorDetailVO(Long doctorId);
+    
+    /**
+     * 创建预约挂号并返回VO
+     * @param patientId 患者ID
+     * @param scheduleId 排班ID
+     * @param isRevisit 是否为复诊(0-初诊,1-复诊)
+     * @return 预约记录VO
+     */
+    AppointmentVO createAppointmentVO(Long patientId, Long scheduleId, Integer isRevisit);
+    
+    /**
+     * 获取患者的预约挂号记录VO
+     * @param patientId 患者ID
+     * @param status 预约状态，可为null表示获取所有状态
+     * @return 预约记录VO列表
+     */
+    List<AppointmentVO> getPatientAppointmentVOs(Long patientId, Integer status);
+    
+    /**
+     * 获取医生的预约挂号记录VO
+     * @param doctorId 医生ID
+     * @param date 指定日期，可为null表示获取所有日期
+     * @param status 预约状态，可为null表示获取所有状态
+     * @return 预约记录VO列表
+     */
+    List<AppointmentVO> getDoctorAppointmentVOs(Long doctorId, LocalDate date, Integer status);
 }

@@ -32,12 +32,12 @@ public class DoctorVO {
     private String name;
     
     /**
-     * 科室ID
+     * 门诊ID
      */
-    private Integer deptId;
+    private Long clinicId;
     
     /**
-     * 科室名称
+     * 科室名称 (非实体字段，用于前端展示)
      */
     private String deptName;
     
@@ -52,14 +52,9 @@ public class DoctorVO {
     private String introduction;
     
     /**
-     * 头像URL
+     * 头像URL (非实体字段，用于前端展示)
      */
     private String avatar;
-    
-    /**
-     * 平均评分
-     */
-    private Double avgRating;
     
     /**
      * 创建时间

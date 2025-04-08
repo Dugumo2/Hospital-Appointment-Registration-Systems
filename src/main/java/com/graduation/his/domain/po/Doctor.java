@@ -15,7 +15,7 @@ import lombok.experimental.Accessors;
  * </p>
  *
  * @author hua
- * @since 2025-03-30
+ * @since 2025-04-04
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
@@ -42,9 +42,9 @@ public class Doctor implements Serializable {
     private String name;
 
     /**
-     * 科室ID
+     * 所属门诊ID
      */
-    private Integer deptId;
+    private Long clinicId;
 
     /**
      * 职称(主任医师,副主任医师等)

@@ -29,8 +29,8 @@ public class DepartmentServiceImpl extends ServiceImpl<DepartmentMapper, Departm
             queryWrapper.eq(Department::getIsActive, 1);
         }
         
-        // 按科室类型和科室名称排序
-        queryWrapper.orderByAsc(Department::getDeptType)
+        // 按科室ID和科室名称排序
+        queryWrapper.orderByAsc(Department::getDeptId)
                 .orderByAsc(Department::getDeptName);
         
         return list(queryWrapper);

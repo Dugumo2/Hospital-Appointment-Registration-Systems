@@ -15,7 +15,7 @@ import lombok.experimental.Accessors;
  * </p>
  *
  * @author hua
- * @since 2025-04-02
+ * @since 2025-04-04
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
@@ -35,21 +35,6 @@ public class Department implements Serializable {
      * 科室名称
      */
     private String deptName;
-
-    /**
-     * 科室编码
-     */
-    private String deptCode;
-
-    /**
-     * 科室类型(0-内科,1-外科,2-妇产科,3-儿科,4-五官科,5-其他)
-     */
-    private Integer deptType;
-
-    /**
-     * 科室描述
-     */
-    private String description;
 
     /**
      * 是否有效(0-无效,1-有效)

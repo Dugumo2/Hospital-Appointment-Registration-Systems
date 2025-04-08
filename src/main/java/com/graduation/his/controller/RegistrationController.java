@@ -1,25 +1,18 @@
 package com.graduation.his.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.graduation.his.common.Result;
 import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
-import com.graduation.his.domain.po.Appointment;
-import com.graduation.his.domain.po.Department;
-import com.graduation.his.domain.po.Doctor;
-import com.graduation.his.domain.po.Patient;
-import com.graduation.his.domain.po.Schedule;
+import com.graduation.his.domain.po.*;
+import com.graduation.his.domain.query.ScheduleQuery;
 import com.graduation.his.domain.vo.AppointmentVO;
-import com.graduation.his.domain.vo.DepartmentVO;
 import com.graduation.his.domain.vo.DoctorVO;
-import com.graduation.his.domain.vo.Result;
-import com.graduation.his.domain.vo.ScheduleVO;
+import com.graduation.his.domain.vo.ScheduleDetailVO;
+import com.graduation.his.domain.vo.ScheduleListVO;
 import com.graduation.his.service.business.IRegistrationService;
-import com.graduation.his.service.entity.IDepartmentService;
-import com.graduation.his.service.entity.IDoctorService;
-import com.graduation.his.service.entity.IPatientService;
+import cn.dev33.satoken.stp.StpUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
@@ -27,11 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * <p>
@@ -49,15 +38,6 @@ public class RegistrationController {
     @Autowired
     private IRegistrationService registrationService;
     
-    @Autowired
-    private IPatientService patientService;
-    
-    @Autowired
-    private IDoctorService doctorService;
-    
-    @Autowired
-    private IDepartmentService departmentService;
-    
     /**
      * 获取科室列表
      * 
@@ -65,71 +45,36 @@ public class RegistrationController {
      * @return 科室列表
      */
     @GetMapping("/departments")
-    public Result<List<DepartmentVO>> getDepartmentList(
+    public Result<List<Department>> getDepartmentList(
             @RequestParam(required = false, defaultValue = "true") boolean onlyActive) {
         log.info("接收到获取科室列表请求, onlyActive: {}", onlyActive);
         try {
-            List<Department> departments = departmentService.getDepartmentList(onlyActive);
-            
-            // 查询各科室的医生数量
-            Map<Long, Long> deptDoctorCount = new HashMap<>();
-            List<Doctor> allDoctors = doctorService.list();
-            for (Doctor doctor : allDoctors) {
-                Long deptId = doctor.getDeptId().longValue();
-                deptDoctorCount.put(deptId, deptDoctorCount.getOrDefault(deptId, 0L) + 1);
-            }
-            
-            List<DepartmentVO> departmentVOs = departments.stream().map(dept -> {
-                DepartmentVO vo = new DepartmentVO();
-                BeanUtils.copyProperties(dept, vo);
-                
-                // 设置科室类型名称
-                vo.setDeptTypeName(getDeptTypeName(dept.getDeptType()));
-                
-                // 设置医生数量
-                vo.setDoctorCount(deptDoctorCount.getOrDefault(dept.getDeptId(), 0L).intValue());
-                
-                return vo;
-            }).collect(Collectors.toList());
-            
-            return Result.ok(departmentVOs, "获取科室列表成功");
+            List<Department> departments = registrationService.getDepartmentList(onlyActive);
+            return Result.success("获取科室列表成功", departments);
         } catch (Exception e) {
             log.error("获取科室列表异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
     /**
-     * 获取科室详情
+     * 获取门诊列表
      * 
-     * @param deptId 科室ID
-     * @return 科室详情
+     * @param deptId 科室ID (可选)
+     * @param onlyActive 是否只返回有效门诊 (可选，默认true)
+     * @return 门诊列表
      */
-    @GetMapping("/departments/{deptId}")
-    public Result<DepartmentVO> getDepartmentDetail(@PathVariable Long deptId) {
-        log.info("接收到获取科室详情请求, deptId: {}", deptId);
+    @GetMapping("/clinics")
+    public Result<List<Clinic>> getClinicList(
+            @RequestParam(required = false) Long deptId,
+            @RequestParam(required = false, defaultValue = "true") boolean onlyActive) {
+        log.info("接收到获取门诊列表请求, deptId: {}, onlyActive: {}", deptId, onlyActive);
         try {
-            Department department = departmentService.getById(deptId);
-            if (department == null) {
-                return Result.fail("科室不存在");
-            }
-            
-            DepartmentVO vo = new DepartmentVO();
-            BeanUtils.copyProperties(department, vo);
-            
-            // 设置科室类型名称
-            vo.setDeptTypeName(getDeptTypeName(department.getDeptType()));
-            
-            // 计算医生数量
-            LambdaQueryWrapper<Doctor> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(Doctor::getDeptId, deptId);
-            long doctorCount = doctorService.count(queryWrapper);
-            vo.setDoctorCount((int) doctorCount);
-            
-            return Result.ok(vo, "获取科室详情成功");
+            List<Clinic> clinics = registrationService.getClinicList(deptId, onlyActive);
+            return Result.success("获取门诊列表成功", clinics);
         } catch (Exception e) {
-            log.error("获取科室详情异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            log.error("获取门诊列表异常", e);
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
@@ -172,13 +117,13 @@ public class RegistrationController {
         log.info("接收到AI问诊请求, patientId: {}, sessionId: {}", request.getPatientId(), request.getSessionId());
         try {
             String sessionId = registrationService.sendAiConsultRequest(request);
-            return Result.ok(sessionId, "AI问诊请求已发送");
+            return Result.success("AI问诊请求已发送", sessionId);
         } catch (IllegalArgumentException e) {
             log.error("AI问诊请求参数错误: {}", e.getMessage());
-            return Result.fail(e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("AI问诊请求异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
@@ -197,13 +142,13 @@ public class RegistrationController {
         log.info("接收到结束AI问诊会话请求, sessionId: {}", sessionId);
         try {
             boolean result = registrationService.endAiConsultSession(sessionId);
-            return Result.ok(result, result ? "会话已结束" : "结束会话失败");
+            return Result.success(result ? "会话已结束" : "结束会话失败", result);
         } catch (IllegalArgumentException e) {
             log.error("结束AI问诊会话参数错误: {}", e.getMessage());
-            return Result.fail(e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("结束AI问诊会话异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
@@ -223,15 +168,15 @@ public class RegistrationController {
         try {
             ConsultSession session = registrationService.getAiConsultHistory(sessionId);
             if (session == null) {
-                return Result.fail("未找到相关会话记录");
+                return Result.error("未找到相关会话记录");
             }
-            return Result.ok(session, "获取会话记录成功");
+            return Result.success("获取会话记录成功", session);
         } catch (IllegalArgumentException e) {
             log.error("获取AI问诊历史会话参数错误: {}", e.getMessage());
-            return Result.fail(e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("获取AI问诊历史会话异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
@@ -239,28 +184,22 @@ public class RegistrationController {
      * 获取医生列表
      * 
      * @param deptId 科室ID (可选)
+     * @param name 医生姓名 (可选，模糊匹配)
+     * @param clinicId 门诊ID (可选)
      * @return 医生列表
      */
     @GetMapping("/doctors")
-    public Result<List<DoctorVO>> getDoctorList(@RequestParam(required = false) Long deptId) {
-        log.info("接收到获取医生列表请求, deptId: {}", deptId);
+    public Result<List<DoctorVO>> getDoctorList(
+            @RequestParam(required = false) Long deptId,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Long clinicId) {
+        log.info("接收到获取医生列表请求, deptId: {}, name: {}, clinicId: {}", deptId, name, clinicId);
         try {
-            List<Doctor> doctors = registrationService.getDoctorList(deptId);
-            List<DoctorVO> doctorVOs = doctors.stream().map(doctor -> {
-                DoctorVO vo = new DoctorVO();
-                BeanUtils.copyProperties(doctor, vo);
-                
-                // 获取科室名称
-                vo.setDeptName(departmentService.getDepartmentName(doctor.getDeptId().longValue()));
-                
-                // TODO: 获取评分等信息
-                
-                return vo;
-            }).collect(Collectors.toList());
-            return Result.ok(doctorVOs, "获取医生列表成功");
+            List<DoctorVO> doctorVOs = registrationService.getDoctorListVO(deptId, name, clinicId);
+            return Result.success("获取医生列表成功", doctorVOs);
         } catch (Exception e) {
             log.error("获取医生列表异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
@@ -274,64 +213,109 @@ public class RegistrationController {
     public Result<DoctorVO> getDoctorDetail(@PathVariable Long doctorId) {
         log.info("接收到获取医生详情请求, doctorId: {}", doctorId);
         try {
-            Doctor doctor = registrationService.getDoctorDetail(doctorId);
-            DoctorVO vo = new DoctorVO();
-            BeanUtils.copyProperties(doctor, vo);
-            
-            // 获取科室名称
-            vo.setDeptName(departmentService.getDepartmentName(doctor.getDeptId().longValue()));
-            
-            // TODO: 获取评分等信息
-            
-            return Result.ok(vo, "获取医生详情成功");
+            DoctorVO vo = registrationService.getDoctorDetailVO(doctorId);
+            return Result.success("获取医生详情成功", vo);
         } catch (IllegalArgumentException e) {
             log.error("获取医生详情参数错误: {}", e.getMessage());
-            return Result.fail(e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("获取医生详情异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
     /**
-     * 获取医生排班
+     * 获取可用排班列表 - 简化版本，用于列表展示
      * 
-     * @param doctorId 医生ID
-     * @param startDate 开始日期 (可选，默认今天)
-     * @param endDate 结束日期 (可选，默认开始日期后7天)
-     * @return 排班列表
+     * @param query 查询参数，包含以下可选条件：
+     *              - deptId（科室ID，可选）
+     *              - clinicId（门诊ID，可选）  
+     *              - doctorId（医生ID，可选）
+     *              - title（医生职称，可选，用于筛选特定职称的医生）
+     *              - startDate（开始日期，可选，默认为当天）
+     *              - endDate（结束日期，可选，默认为开始日期后7天）
+     * @return 排班列表，包含医生基本信息和可预约状态
      */
-    @GetMapping("/doctors/{doctorId}/schedules")
-    public Result<List<ScheduleVO>> getDoctorSchedules(
-            @PathVariable Long doctorId,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
-        log.info("接收到获取医生排班请求, doctorId: {}, startDate: {}, endDate: {}", doctorId, startDate, endDate);
+    @PostMapping("/schedules")
+    public Result<List<ScheduleListVO>> getScheduleList(ScheduleQuery query) {
+        log.info("接收到获取排班列表请求, 查询条件: {}", query);
         try {
-            Map<LocalDate, List<Schedule>> scheduleMap = registrationService.getDoctorSchedule(doctorId, startDate, endDate);
-            
-            List<ScheduleVO> scheduleVOs = new ArrayList<>();
-            Doctor doctor = doctorService.getById(doctorId);
-            
-            scheduleMap.forEach((date, schedules) -> {
-                for (Schedule schedule : schedules) {
-                    ScheduleVO vo = new ScheduleVO();
-                    BeanUtils.copyProperties(schedule, vo);
-                    vo.setDoctorName(doctor != null ? doctor.getName() : "");
-                    
-                    // TODO: 计算已预约人数和是否可预约等信息
-                    
-                    scheduleVOs.add(vo);
+            List<ScheduleListVO> scheduleVOs = registrationService.getScheduleListVO(query);
+            return Result.success("获取排班列表成功", scheduleVOs);
+        } catch (Exception e) {
+            log.error("获取排班列表异常", e);
+            return Result.error("服务异常，请稍后重试");
+        }
+    }
+    
+    /**
+     * 获取排班详情 - 详细版本，用于预约页面
+     * 
+     * @param scheduleId 排班ID
+     * @return 排班详情，包含医生、科室、门诊和预约相关的完整信息
+     */
+    @GetMapping("/schedules/{scheduleId}")
+    public Result<ScheduleDetailVO> getScheduleDetail(@PathVariable Long scheduleId) {
+        log.info("接收到获取排班详情请求, scheduleId: {}", scheduleId);
+        try {
+            // 获取当前登录用户ID，如果有的话
+            Long patientId = null;
+            // 使用Sa-Token获取用户ID
+            if (StpUtil.isLogin()) {
+                Long userId = StpUtil.getLoginIdAsLong();
+                // 根据用户ID查询患者信息
+                Patient patient = registrationService.getPatientByUserId(userId);
+                if (patient != null) {
+                    patientId = patient.getPatientId();
                 }
-            });
+            }
             
-            return Result.ok(scheduleVOs, "获取医生排班成功");
+            ScheduleDetailVO detailVO = registrationService.getScheduleDetail(scheduleId, patientId);
+            return Result.success("获取排班详情成功", detailVO);
+        } catch (IllegalArgumentException e) {
+            log.error("获取排班详情参数错误: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("获取排班详情异常", e);
+            return Result.error("服务异常，请稍后重试");
+        }
+    }
+    
+    /**
+     * 获取医生排班 - 简化版本，用于列表展示
+     * 
+     * @param query 查询参数，包含以下可选条件：
+     *              - doctorId（医生ID，必填）
+     *              - title（医生职称，可选，用于筛选特定职称的医生）
+     *              - startDate（开始日期，可选，默认为当天）
+     *              - endDate（结束日期，可选，默认为开始日期后7天）
+     * @return 排班列表，包含医生基本信息和可预约状态
+     */
+    @PostMapping("/doctor-schedules")
+    public Result<List<ScheduleListVO>> getDoctorSchedules(ScheduleQuery query) {
+        if (query == null || query.getDoctorId() == null) {
+            return Result.error("医生ID不能为空");
+        }
+        
+        log.info("接收到获取医生排班请求, 查询条件: {}", query);
+        try {
+            // 设置默认值：开始日期默认今天，结束日期默认为开始日期后7天
+            if (query.getStartDate() == null) {
+                query.setStartDate(LocalDate.now());
+            }
+            
+            if (query.getEndDate() == null) {
+                query.setEndDate(query.getStartDate().plusDays(6)); // 一周
+            }
+            
+            List<ScheduleListVO> scheduleVOs = registrationService.getScheduleListVO(query);
+            return Result.success("获取医生排班成功", scheduleVOs);
         } catch (IllegalArgumentException e) {
             log.error("获取医生排班参数错误: {}", e.getMessage());
-            return Result.fail(e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("获取医生排班异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
@@ -340,51 +324,24 @@ public class RegistrationController {
      * 
      * @param patientId 患者ID
      * @param scheduleId 排班ID
+     * @param isRevisit 是否为复诊(0-初诊,1-复诊)
      * @return 预约记录
      */
     @PostMapping("/create")
     public Result<AppointmentVO> createAppointment(
             @RequestParam Long patientId,
-            @RequestParam Long scheduleId) {
-        log.info("接收到创建预约挂号请求, patientId: {}, scheduleId: {}", patientId, scheduleId);
+            @RequestParam Long scheduleId,
+            @RequestParam(required = false, defaultValue = "0") Integer isRevisit) {
+        log.info("接收到创建预约挂号请求, patientId: {}, scheduleId: {}, isRevisit: {}", patientId, scheduleId, isRevisit);
         try {
-            Appointment appointment = registrationService.createAppointment(patientId, scheduleId);
-            
-            // 构建返回VO
-            AppointmentVO vo = new AppointmentVO();
-            BeanUtils.copyProperties(appointment, vo);
-            
-            // 获取患者信息
-            Patient patient = patientService.getById(patientId);
-            if (patient != null) {
-                vo.setPatientName(patient.getName());
-            }
-            
-            // 获取医生信息
-            Doctor doctor = doctorService.getById(appointment.getDoctorId());
-            if (doctor != null) {
-                vo.setDoctorName(doctor.getName());
-                vo.setDeptId(doctor.getDeptId());
-                // 获取科室名称
-                vo.setDeptName(departmentService.getDepartmentName(doctor.getDeptId().longValue()));
-            }
-            
-            // 设置状态描述
-            vo.setStatusDesc(getStatusDesc(appointment.getStatus()));
-            
-            // 设置是否可取消
-            LocalDate today = LocalDate.now();
-            boolean canCancel = appointment.getStatus() == 0 // 未就诊
-                    && appointment.getAppointmentDate().isAfter(today); // 非当天
-            vo.setCanCancel(canCancel);
-            
-            return Result.ok(vo, "预约挂号成功");
+            AppointmentVO vo = registrationService.createAppointmentVO(patientId, scheduleId, isRevisit);
+            return Result.success("预约挂号成功", vo);
         } catch (IllegalArgumentException e) {
             log.error("创建预约挂号参数错误: {}", e.getMessage());
-            return Result.fail(e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("创建预约挂号异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
@@ -402,13 +359,13 @@ public class RegistrationController {
         log.info("接收到取消预约挂号请求, appointmentId: {}, patientId: {}", appointmentId, patientId);
         try {
             boolean result = registrationService.cancelAppointment(appointmentId, patientId);
-            return Result.ok(result, result ? "取消预约成功" : "取消预约失败");
+            return Result.success(result ? "取消预约成功" : "取消预约失败", result);
         } catch (IllegalArgumentException e) {
             log.error("取消预约挂号参数错误: {}", e.getMessage());
-            return Result.fail(e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("取消预约挂号异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
@@ -425,15 +382,14 @@ public class RegistrationController {
             @RequestParam(required = false) Integer status) {
         log.info("接收到获取患者预约记录请求, patientId: {}, status: {}", patientId, status);
         try {
-            List<Appointment> appointments = registrationService.getPatientAppointments(patientId, status);
-            List<AppointmentVO> appointmentVOs = convertToAppointmentVOs(appointments);
-            return Result.ok(appointmentVOs, "获取预约记录成功");
+            List<AppointmentVO> appointmentVOs = registrationService.getPatientAppointmentVOs(patientId, status);
+            return Result.success("获取预约记录成功", appointmentVOs);
         } catch (IllegalArgumentException e) {
             log.error("获取患者预约记录参数错误: {}", e.getMessage());
-            return Result.fail(e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("获取患者预约记录异常", e);
-            return Result.fail("服务异常，请稍后重试");
+            return Result.error("服务异常，请稍后重试");
         }
     }
     
@@ -452,101 +408,14 @@ public class RegistrationController {
             @RequestParam(required = false) Integer status) {
         log.info("接收到获取医生预约记录请求, doctorId: {}, date: {}, status: {}", doctorId, date, status);
         try {
-            List<Appointment> appointments = registrationService.getDoctorAppointments(doctorId, date, status);
-            List<AppointmentVO> appointmentVOs = convertToAppointmentVOs(appointments);
-            return Result.ok(appointmentVOs, "获取预约记录成功");
+            List<AppointmentVO> appointmentVOs = registrationService.getDoctorAppointmentVOs(doctorId, date, status);
+            return Result.success("获取预约记录成功", appointmentVOs);
         } catch (IllegalArgumentException e) {
             log.error("获取医生预约记录参数错误: {}", e.getMessage());
-            return Result.fail(e.getMessage());
+            return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("获取医生预约记录异常", e);
-            return Result.fail("服务异常，请稍后重试");
-        }
-    }
-    
-    /**
-     * 将 Appointment 列表转换为 AppointmentVO 列表
-     */
-    private List<AppointmentVO> convertToAppointmentVOs(List<Appointment> appointments) {
-        List<AppointmentVO> vos = new ArrayList<>();
-        
-        for (Appointment appointment : appointments) {
-            AppointmentVO vo = new AppointmentVO();
-            BeanUtils.copyProperties(appointment, vo);
-            
-            // 获取患者信息
-            Patient patient = patientService.getById(appointment.getPatientId());
-            if (patient != null) {
-                vo.setPatientName(patient.getName());
-            }
-            
-            // 获取医生信息
-            Doctor doctor = doctorService.getById(appointment.getDoctorId());
-            if (doctor != null) {
-                vo.setDoctorName(doctor.getName());
-                vo.setDeptId(doctor.getDeptId());
-                // 获取科室名称
-                vo.setDeptName(departmentService.getDepartmentName(doctor.getDeptId().longValue()));
-            }
-            
-            // 设置状态描述
-            vo.setStatusDesc(getStatusDesc(appointment.getStatus()));
-            
-            // 设置是否可取消
-            LocalDate today = LocalDate.now();
-            boolean canCancel = appointment.getStatus() == 0 // 未就诊
-                    && appointment.getAppointmentDate().isAfter(today); // 非当天
-            vo.setCanCancel(canCancel);
-            
-            vos.add(vo);
-        }
-        
-        return vos;
-    }
-    
-    /**
-     * 获取预约状态描述
-     */
-    private String getStatusDesc(Integer status) {
-        if (status == null) {
-            return "未知状态";
-        }
-        
-        switch (status) {
-            case 0:
-                return "待就诊";
-            case 1:
-                return "已就诊";
-            case 2:
-                return "已取消";
-            default:
-                return "未知状态";
-        }
-    }
-    
-    /**
-     * 获取科室类型名称
-     */
-    private String getDeptTypeName(Integer deptType) {
-        if (deptType == null) {
-            return "其他";
-        }
-        
-        switch (deptType) {
-            case 0:
-                return "内科";
-            case 1:
-                return "外科";
-            case 2:
-                return "妇产科";
-            case 3:
-                return "儿科";
-            case 4:
-                return "五官科";
-            case 5:
-                return "其他";
-            default:
-                return "其他";
+            return Result.error("服务异常，请稍后重试");
         }
     }
 }

@@ -9,13 +9,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 医生排班信息VO，用于接口返回
+ * 排班列表简单VO，用于排班列表展示
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ScheduleVO {
+public class ScheduleListVO {
     
     /**
      * 排班ID
@@ -33,19 +33,19 @@ public class ScheduleVO {
     private String doctorName;
     
     /**
-     * 门诊ID
+     * 医生职称
      */
-    private Long clinicId;
+    private String doctorTitle;
     
     /**
-     * 门诊名称
+     * 医生简介
      */
-    private String clinicName;
+    private String doctorIntroduction;
     
     /**
-     * 科室名称
+     * 医生头像URL
      */
-    private String deptName;
+    private String doctorAvatar;
     
     /**
      * 排班日期
@@ -58,32 +58,12 @@ public class ScheduleVO {
     private String timeSlot;
     
     /**
-     * 该时段可挂号最大人数
-     */
-    private Integer maxPatients;
-    
-    /**
-     * 当前已预约人数
-     */
-    private Integer currentPatients;
-    
-    /**
-     * 剩余可预约数量
+     * 可用剩余名额
      */
     private Integer remainingQuota;
-    
-    /**
-     * 排班状态(0-无效,1-有效)
-     */
-    private Integer status;
     
     /**
      * 是否可预约
      */
     private Boolean canBook;
-    
-    /**
-     * 创建时间
-     */
-    private LocalDateTime createTime;
 } 
