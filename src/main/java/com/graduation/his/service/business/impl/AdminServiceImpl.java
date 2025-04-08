@@ -819,7 +819,7 @@ public class AdminServiceImpl implements IAdminService {
             throw new BusinessException("不能修改过期的排班");
         }
         
-        // TODO: 检查排班是否已被预约，如果已被预约则不允许修改
+        // 检查排班是否已被预约，如果已被预约则不允许修改
         if (existingSchedule.getCurrentPatients() != null && existingSchedule.getCurrentPatients() > 0) {
             throw new BusinessException("该排班已有预约，无法修改");
         }

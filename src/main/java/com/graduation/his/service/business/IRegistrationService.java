@@ -131,6 +131,14 @@ public interface IRegistrationService {
     List<Clinic> getClinicList(Long deptId, boolean onlyActive);
     
     /**
+     * 通过名称查询门诊列表
+     * @param name 门诊名称 (模糊匹配)
+     * @param onlyActive 是否只返回有效门诊
+     * @return 门诊列表
+     */
+    List<Clinic> getClinicsByName(String name, boolean onlyActive);
+    
+    /**
      * 根据用户ID获取患者信息
      * @param userId 用户ID
      * @return 患者信息

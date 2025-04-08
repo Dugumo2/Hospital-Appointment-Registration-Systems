@@ -79,6 +79,30 @@ public class RegistrationController {
     }
     
     /**
+     * 通过名称搜索门诊列表
+     * 
+     * @param name 门诊名称 (模糊匹配)
+     * @param onlyActive 是否只返回有效门诊 (可选，默认true)
+     * @return 门诊列表
+     */
+    @GetMapping("/clinics/search")
+    public Result<List<Clinic>> searchClinicByName(
+            @RequestParam String name,
+            @RequestParam(required = false, defaultValue = "true") boolean onlyActive) {
+        log.info("接收到通过名称搜索门诊列表请求, name: {}, onlyActive: {}", name, onlyActive);
+        try {
+            List<Clinic> clinics = registrationService.getClinicsByName(name, onlyActive);
+            return Result.success("搜索门诊列表成功", clinics);
+        } catch (IllegalArgumentException e) {
+            log.error("搜索门诊列表参数错误: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("搜索门诊列表异常", e);
+            return Result.error("服务异常，请稍后重试");
+        }
+    }
+    
+    /**
      * 创建AI问诊SSE连接
      * 
      * 创建Server-Sent Events连接，用于实时接收AI问诊响应

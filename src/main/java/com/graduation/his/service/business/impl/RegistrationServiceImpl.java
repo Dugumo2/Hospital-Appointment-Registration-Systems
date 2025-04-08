@@ -836,4 +836,25 @@ public class RegistrationServiceImpl implements IRegistrationService {
                 return "未知";
         }
     }
+
+    @Override
+    public List<Clinic> getClinicsByName(String name, boolean onlyActive) {
+        log.info("通过名称查询门诊列表, name: {}, onlyActive: {}", name, onlyActive);
+        
+        if (name == null || name.trim().isEmpty()) {
+            throw new BusinessException("门诊名称不能为空");
+        }
+        
+        // 调用实体服务查询门诊
+        List<Clinic> clinics = clinicService.getClinicsByName(name);
+        
+        // 如果需要过滤有效门诊
+        if (onlyActive && clinics != null) {
+            clinics = clinics.stream()
+                    .filter(clinic -> clinic.getIsActive() == 1)
+                    .collect(Collectors.toList());
+        }
+        
+        return clinics;
+    }
 }
