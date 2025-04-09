@@ -117,4 +117,19 @@ public interface IMedicalService {
      * @return 是否为当前医生
      */
     boolean isCurrentDoctor(Long doctorId);
+    
+    /**
+     * 异步发送消息到RabbitMQ
+     * @param exchange 交换机
+     * @param routingKey 路由键
+     * @param message 消息
+     */
+    void sendToRabbitMQAsync(String exchange, String routingKey, Object message);
+    
+    /**
+     * 异步更新用户未读消息数量
+     * @param userId 用户ID
+     * @param count 增加的数量
+     */
+    void updateUnreadMessageCountAsync(Long userId, int count);
 }

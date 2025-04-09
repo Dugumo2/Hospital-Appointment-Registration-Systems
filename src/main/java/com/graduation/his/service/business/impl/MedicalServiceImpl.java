@@ -389,8 +389,9 @@ public class MedicalServiceImpl implements IMedicalService {
      * @param routingKey 路由键
      * @param message 消息
      */
+    @Override
     @Async("threadPoolTaskExecutor")
-    private void sendToRabbitMQAsync(String exchange, String routingKey, Object message) {
+    public void sendToRabbitMQAsync(String exchange, String routingKey, Object message) {
         try {
             log.info("异步发送消息到RabbitMQ, exchange: {}, routingKey: {}", exchange, routingKey);
             rabbitTemplate.convertAndSend(exchange, routingKey, message);
@@ -405,8 +406,9 @@ public class MedicalServiceImpl implements IMedicalService {
      * @param userId 用户ID
      * @param count 增加的数量
      */
+    @Override
     @Async("threadPoolTaskExecutor")
-    private void updateUnreadMessageCountAsync(Long userId, int count) {
+    public void updateUnreadMessageCountAsync(Long userId, int count) {
         try {
             log.info("异步更新用户未读消息数量, userId: {}, count: {}", userId, count);
             String redisKey = Constants.RedisKey.MESSAGE_USER + userId;
