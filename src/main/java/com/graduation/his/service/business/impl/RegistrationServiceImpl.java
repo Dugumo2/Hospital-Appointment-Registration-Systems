@@ -2,7 +2,7 @@ package com.graduation.his.service.business.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.graduation.his.common.exception.BusinessException;
+import com.graduation.his.exception.BusinessException;
 import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
@@ -25,7 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDate;

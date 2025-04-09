@@ -6,4 +6,5 @@ package com.graduation.his.controller;
  * @create 2025-03-30 16:12
  */
 public class MedicalServiceController {
+
 }

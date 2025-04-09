@@ -2,7 +2,7 @@ package com.graduation.his.service.entity.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.graduation.his.common.exception.BusinessException;
+import com.graduation.his.exception.BusinessException;
 import com.graduation.his.domain.po.Schedule;
 import com.graduation.his.mapper.ScheduleMapper;
 import com.graduation.his.service.entity.IScheduleService;

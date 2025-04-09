@@ -1,9 +1,8 @@
 package com.graduation.his.service.business.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.graduation.his.common.Constants;
-import com.graduation.his.common.exception.BusinessException;
+import com.graduation.his.exception.BusinessException;
 import com.graduation.his.domain.dto.UserLoginDTO;
 import com.graduation.his.domain.dto.UserRegisterDTO;
 import com.graduation.his.domain.po.Patient;

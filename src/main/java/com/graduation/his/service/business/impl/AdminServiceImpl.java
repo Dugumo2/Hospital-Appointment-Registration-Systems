@@ -2,7 +2,7 @@ package com.graduation.his.service.business.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.graduation.his.common.exception.BusinessException;
+import com.graduation.his.exception.BusinessException;
 import com.graduation.his.domain.po.Clinic;
 import com.graduation.his.domain.po.Department;
 import com.graduation.his.domain.po.Doctor;
@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 

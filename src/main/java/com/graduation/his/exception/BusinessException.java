@@ -1,4 +1,4 @@
-package com.graduation.his.common.exception;
+package com.graduation.his.exception;
 
 /**
  * 业务异常类
