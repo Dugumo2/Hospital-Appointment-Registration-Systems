@@ -5,7 +5,7 @@ import com.graduation.his.domain.po.FeedbackMessage;
 
 /**
  * <p>
- * 诊后反馈消息表 Mapper 接口
+ * 诊后反馈消息 Mapper 接口
  * </p>
  *
  * @author hua

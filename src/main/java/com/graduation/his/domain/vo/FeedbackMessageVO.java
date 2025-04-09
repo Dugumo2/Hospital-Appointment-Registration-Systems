@@ -1,18 +1,15 @@
-package com.graduation.his.domain.po;
+package com.graduation.his.domain.vo;
 
-import java.io.Serializable;
-import java.time.LocalDateTime;
-
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
+import java.io.Serializable;
+import java.time.LocalDateTime;
+
 /**
  * <p>
- * 诊后反馈消息
+ * 诊后反馈消息VO
  * </p>
  *
  * @author hua
@@ -21,15 +18,13 @@ import lombok.experimental.Accessors;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("feedback_message")
-public class FeedbackMessage implements Serializable {
+public class FeedbackMessageVO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
      * 消息ID
      */
-    @TableId(value = "message_id", type = IdType.AUTO)
     private Long messageId;
 
     /**
@@ -63,12 +58,7 @@ public class FeedbackMessage implements Serializable {
     private Integer readStatus;
 
     /**
-     * 创建时间
+     * 发送时间
      */
     private LocalDateTime createTime;
-
-    /**
-     * 更新时间
-     */
-    private LocalDateTime updateTime;
-}
+} 
