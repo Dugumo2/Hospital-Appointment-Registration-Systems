@@ -727,28 +727,6 @@ public class AdminServiceImpl implements IAdminService {
     }
     
     @Override
-    public List<Clinic> getClinicList(Long deptId, Boolean isActive) {
-        log.info("获取门诊列表, deptId: {}, isActive: {}", deptId, isActive);
-        
-        LambdaQueryWrapper<Clinic> queryWrapper = new LambdaQueryWrapper<>();
-        
-        // 添加条件
-        if (deptId != null) {
-            queryWrapper.eq(Clinic::getDeptId, deptId);
-        }
-        
-        if (isActive != null) {
-            queryWrapper.eq(Clinic::getIsActive, isActive ? 1 : 0);
-        }
-        
-        // 排序
-        queryWrapper.orderByAsc(Clinic::getDeptId)
-                .orderByAsc(Clinic::getClinicId);
-        
-        return clinicService.list(queryWrapper);
-    }
-    
-    @Override
     public Clinic getClinicDetail(Long clinicId) {
         log.info("获取门诊详情, clinicId: {}", clinicId);
         

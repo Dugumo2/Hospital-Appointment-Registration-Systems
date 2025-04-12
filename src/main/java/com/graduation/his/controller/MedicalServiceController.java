@@ -1,5 +1,7 @@
 package com.graduation.his.controller;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
 import com.graduation.his.common.Result;
 import com.graduation.his.domain.dto.FeedbackMessageDTO;
 import com.graduation.his.domain.po.User;
@@ -31,6 +33,7 @@ public class MedicalServiceController {
      * @param patientId 患者ID
      * @return 诊断记录列表
      */
+    @SaCheckRole("patient")
     @GetMapping("/patient/{patientId}/diagnoses")
     public Result<List<DiagnosisVO>> getPatientDiagnoses(@PathVariable Long patientId) {
         log.info("获取患者的诊断记录列表, patientId: {}", patientId);
@@ -60,6 +63,7 @@ public class MedicalServiceController {
      * @param doctorId 医生ID
      * @return 诊断记录列表
      */
+    @SaCheckRole("doctor")
     @GetMapping("/doctor/{doctorId}/diagnoses")
     public Result<List<DiagnosisVO>> getDoctorDiagnoses(@PathVariable Long doctorId) {
         log.info("获取医生的诊断记录列表, doctorId: {}", doctorId);
@@ -89,6 +93,7 @@ public class MedicalServiceController {
      * @param diagId 诊断ID
      * @return 诊断详情
      */
+    @SaCheckRole(value = {"doctor,patient"},mode = SaMode.OR)
     @GetMapping("/diagnoses/{diagId}")
     public Result<DiagnosisVO> getDiagnosisDetail(@PathVariable Long diagId) {
         log.info("获取诊断详情, diagId: {}", diagId);
@@ -119,6 +124,7 @@ public class MedicalServiceController {
      * @param diagId 诊断ID
      * @return 反馈消息列表
      */
+    @SaCheckRole(value = {"doctor,patient"},mode = SaMode.OR)
     @GetMapping("/diagnoses/{diagId}/feedback")
     public Result<List<FeedbackMessageDTO>> getFeedbackMessages(@PathVariable Long diagId) {
         log.info("获取诊断相关的所有反馈消息, diagId: {}", diagId);
@@ -158,6 +164,7 @@ public class MedicalServiceController {
      * @param content 消息内容
      * @return 反馈消息
      */
+    @SaCheckRole(value = {"doctor,patient"},mode = SaMode.OR)
     @PostMapping("/diagnoses/{diagId}/feedback")
     public Result<FeedbackMessageDTO> sendFeedbackMessage(@PathVariable Long diagId, @RequestParam String content) {
         log.info("发送诊后反馈消息, diagId: {}, content: {}", diagId, content);
@@ -206,6 +213,7 @@ public class MedicalServiceController {
      * @param messageId 消息ID
      * @return 是否成功
      */
+    @SaCheckRole(value = {"doctor,patient"},mode = SaMode.OR)
     @PostMapping("/feedback/{messageId}/read")
     public Result<Boolean> markMessageAsRead(@PathVariable Long messageId) {
         log.info("标记消息为已读, messageId: {}", messageId);
@@ -226,6 +234,7 @@ public class MedicalServiceController {
      * 
      * @return 未读消息数量
      */
+    @SaCheckRole(value = {"doctor,patient"},mode = SaMode.OR)
     @GetMapping("/feedback/unread/count")
     public Result<Integer> getUnreadMessageCount() {
         try {
@@ -241,7 +250,7 @@ public class MedicalServiceController {
                 // 医生
                 entityId = medicalService.getDoctorIdByUserId(user.getId());
             } else {
-                return Result.error("管理员无法查看未读消息");
+                return Result.error("未知错误，请联系管理员");
             }
             
             int count = medicalService.getUnreadMessageCount(entityId, user.getRole());

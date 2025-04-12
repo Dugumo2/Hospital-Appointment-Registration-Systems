@@ -1,5 +1,7 @@
 package com.graduation.his.controller;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
 import com.graduation.his.common.Result;
 import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
@@ -10,10 +12,12 @@ import com.graduation.his.domain.vo.AppointmentVO;
 import com.graduation.his.domain.vo.DoctorVO;
 import com.graduation.his.domain.vo.ScheduleDetailVO;
 import com.graduation.his.domain.vo.ScheduleListVO;
+import com.graduation.his.exception.BusinessException;
 import com.graduation.his.service.business.IRegistrationService;
 import cn.dev33.satoken.stp.StpUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -44,6 +48,7 @@ public class RegistrationController {
      * @param onlyActive 是否只返回有效科室 (可选，默认true)
      * @return 科室列表
      */
+    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
     @GetMapping("/departments")
     public Result<List<Department>> getDepartmentList(
             @RequestParam(required = false, defaultValue = "true") boolean onlyActive) {
@@ -64,6 +69,7 @@ public class RegistrationController {
      * @param onlyActive 是否只返回有效门诊 (可选，默认true)
      * @return 门诊列表
      */
+    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
     @GetMapping("/clinics")
     public Result<List<Clinic>> getClinicList(
             @RequestParam(required = false) Long deptId,
@@ -85,6 +91,7 @@ public class RegistrationController {
      * @param onlyActive 是否只返回有效门诊 (可选，默认true)
      * @return 门诊列表
      */
+    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
     @GetMapping("/clinics/search")
     public Result<List<Clinic>> searchClinicByName(
             @RequestParam String name,
@@ -111,6 +118,7 @@ public class RegistrationController {
      * @param request 连接请求(包含会话ID、预约ID和患者ID)
      * @return SSE连接
      */
+    @SaCheckRole("patient")
     @PostMapping(value = "/ai-consult/connect", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter createAiConsultConnection(@RequestBody AiConsultConnectionRequest request) {
         log.info("接收到创建AI问诊SSE连接请求, appointmentId: {}, patientId: {}, sessionId: {}", 
@@ -136,6 +144,7 @@ public class RegistrationController {
      * @param request 问诊请求
      * @return 结果(包含会话ID)
      */
+    @SaCheckRole("patient")
     @PostMapping("/ai-consult/send")
     public Result<String> sendAiConsultRequest(@RequestBody AiConsultRequest request) {
         log.info("接收到AI问诊请求, patientId: {}, sessionId: {}", request.getPatientId(), request.getSessionId());
@@ -160,6 +169,7 @@ public class RegistrationController {
      * @param sessionId 会话ID
      * @return 结果
      */
+    @SaCheckRole("patient")
     @PostMapping("/ai-consult/end")
     public Result<Boolean> endAiConsultSession(
             @RequestParam String sessionId) {
@@ -185,6 +195,7 @@ public class RegistrationController {
      * @param sessionId 会话ID
      * @return 会话详情
      */
+    @SaCheckRole("patient")
     @GetMapping("/ai-consult/history")
     public Result<ConsultSession> getAiConsultHistory(
             @RequestParam String sessionId) {
@@ -212,6 +223,7 @@ public class RegistrationController {
      * @param clinicId 门诊ID (可选)
      * @return 医生列表
      */
+    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
     @GetMapping("/doctors")
     public Result<List<DoctorVO>> getDoctorList(
             @RequestParam(required = false) Long deptId,
@@ -233,6 +245,7 @@ public class RegistrationController {
      * @param doctorId 医生ID
      * @return 医生详情
      */
+    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
     @GetMapping("/doctors/{doctorId}")
     public Result<DoctorVO> getDoctorDetail(@PathVariable Long doctorId) {
         log.info("接收到获取医生详情请求, doctorId: {}", doctorId);
@@ -260,6 +273,7 @@ public class RegistrationController {
      *              - endDate（结束日期，可选，默认为开始日期后7天）
      * @return 排班列表，包含医生基本信息和可预约状态
      */
+    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
     @PostMapping("/schedules")
     public Result<List<ScheduleListVO>> getScheduleList(ScheduleQuery query) {
         log.info("接收到获取排班列表请求, 查询条件: {}", query);
@@ -278,6 +292,7 @@ public class RegistrationController {
      * @param scheduleId 排班ID
      * @return 排班详情，包含医生、科室、门诊和预约相关的完整信息
      */
+    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
     @GetMapping("/schedules/{scheduleId}")
     public Result<ScheduleDetailVO> getScheduleDetail(@PathVariable Long scheduleId) {
         log.info("接收到获取排班详情请求, scheduleId: {}", scheduleId);
@@ -315,6 +330,7 @@ public class RegistrationController {
      *              - endDate（结束日期，可选，默认为开始日期后7天）
      * @return 排班列表，包含医生基本信息和可预约状态
      */
+    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
     @PostMapping("/doctor-schedules")
     public Result<List<ScheduleListVO>> getDoctorSchedules(ScheduleQuery query) {
         if (query == null || query.getDoctorId() == null) {
@@ -351,6 +367,7 @@ public class RegistrationController {
      * @param isRevisit 是否为复诊(0-初诊,1-复诊)
      * @return 预约记录
      */
+    @SaCheckRole("patient")
     @PostMapping("/create")
     public Result<AppointmentVO> createAppointment(
             @RequestParam Long patientId,
@@ -376,6 +393,7 @@ public class RegistrationController {
      * @param patientId 患者ID
      * @return 取消结果
      */
+    @SaCheckRole("patient")
     @PostMapping("/cancel")
     public Result<Boolean> cancelAppointment(
             @RequestParam Long appointmentId,
@@ -400,6 +418,7 @@ public class RegistrationController {
      * @param status 预约状态 (可选)
      * @return 预约记录列表
      */
+    @SaCheckRole("patient")
     @GetMapping("/patient/{patientId}")
     public Result<List<AppointmentVO>> getPatientAppointments(
             @PathVariable Long patientId,
@@ -425,6 +444,7 @@ public class RegistrationController {
      * @param status 预约状态 (可选)
      * @return 预约记录列表
      */
+    @SaCheckRole("doctor")
     @GetMapping("/doctor/{doctorId}")
     public Result<List<AppointmentVO>> getDoctorAppointments(
             @PathVariable Long doctorId,
@@ -439,6 +459,65 @@ public class RegistrationController {
             return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("获取医生预约记录异常", e);
+            return Result.error("服务异常，请稍后重试");
+        }
+    }
+    
+    /**
+     * 医生查看挂号记录详情
+     * 
+     * 获取挂号记录的详细信息，包括患者信息、医生信息、科室和门诊信息
+     * 同时返回是否有关联的AI问诊会话ID
+     * 
+     * @param appointmentId 挂号记录ID
+     * @param doctorId 医生ID，用于权限验证
+     * @return 挂号记录详情
+     */
+    @SaCheckRole("doctor")
+    @GetMapping("/doctor/{doctorId}/appointment/{appointmentId}")
+    public Result<AppointmentVO> getAppointmentDetail(
+            @PathVariable Long doctorId,
+            @PathVariable Long appointmentId) {
+        log.info("接收到医生查看挂号记录详情请求, doctorId: {}, appointmentId: {}", doctorId, appointmentId);
+        try {
+            AppointmentVO vo = registrationService.getAppointmentDetail(appointmentId, doctorId);
+            return Result.success("获取挂号记录详情成功", vo);
+        } catch (BusinessException e) {
+            log.error("获取挂号记录详情业务异常: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("获取挂号记录详情异常", e);
+            return Result.error("服务异常，请稍后重试");
+        }
+    }
+    
+    /**
+     * 医生查看挂号关联的AI问诊记录
+     * 
+     * 查询特定挂号记录绑定的AI问诊记录详情
+     * 如果该挂号没有关联的AI问诊记录，则返回null
+     * 
+     * @param appointmentId 挂号记录ID
+     * @param doctorId 医生ID，用于权限验证
+     * @return AI问诊会话详情
+     */
+    @SaCheckRole("doctor")
+    @GetMapping("/doctor/{doctorId}/appointment/{appointmentId}/ai-consult")
+    public Result<ConsultSession> getAiConsultByAppointment(
+            @PathVariable Long doctorId,
+            @PathVariable Long appointmentId) {
+        log.info("接收到查询挂号关联的AI问诊记录请求, doctorId: {}, appointmentId: {}", doctorId, appointmentId);
+        try {
+            ConsultSession session = registrationService.getAiConsultByAppointmentId(appointmentId, doctorId);
+            if (session == null) {
+                return Result.success("该挂号记录没有关联的AI问诊记录", null);
+            }
+            return Result.success("获取AI问诊记录成功", session);
+        } catch (BusinessException e) {
+            log.error("获取挂号关联的AI问诊记录业务异常: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("获取挂号关联的AI问诊记录异常", e);
             return Result.error("服务异常，请稍后重试");
         }
     }

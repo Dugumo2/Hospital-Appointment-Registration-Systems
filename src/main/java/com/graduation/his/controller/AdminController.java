@@ -1,5 +1,6 @@
 package com.graduation.his.controller;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
 import com.graduation.his.common.Result;
 import com.graduation.his.domain.po.Clinic;
 import com.graduation.his.domain.po.Department;
@@ -19,6 +20,7 @@ import java.util.Map;
  * @description 管理模块控制器
  * @create 2025-04-04 16:10
  */
+@SaCheckRole("admin")
 @RestController
 @RequestMapping("/admin")
 public class AdminController {

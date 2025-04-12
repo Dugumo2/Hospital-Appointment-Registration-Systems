@@ -199,14 +199,7 @@ public interface IAdminService {
      * @return 是否删除成功
      */
     boolean physicalDeleteClinic(Long clinicId);
-    
-    /**
-     * 获取门诊列表
-     * @param deptId 科室ID（可选）
-     * @param isActive 是否有效（可选）
-     * @return 门诊列表
-     */
-    List<Clinic> getClinicList(Long deptId, Boolean isActive);
+
     
     /**
      * 获取门诊详情

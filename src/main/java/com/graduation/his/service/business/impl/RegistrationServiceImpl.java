@@ -6,6 +6,7 @@ import com.graduation.his.exception.BusinessException;
 import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
+import com.graduation.his.domain.po.AiConsultRecord;
 import com.graduation.his.domain.po.Appointment;
 import com.graduation.his.domain.po.Clinic;
 import com.graduation.his.domain.po.Department;
@@ -32,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.UUID;
 
 /**
  * @author hua
@@ -678,6 +680,154 @@ public class RegistrationServiceImpl implements IRegistrationService {
         
         // 转换为VO
         return convertToAppointmentVOs(appointments);
+    }
+
+    @Override
+    public ConsultSession getAiConsultByAppointmentId(Long appointmentId, Long doctorId) {
+        log.info("获取挂号关联的AI问诊记录, appointmentId: {}, doctorId: {}", appointmentId, doctorId);
+        
+        if (appointmentId == null) {
+            throw new BusinessException("挂号记录ID不能为空");
+        }
+        
+        if (doctorId == null) {
+            throw new BusinessException("医生ID不能为空");
+        }
+        
+        // 获取挂号记录
+        Appointment appointment = appointmentService.getById(appointmentId);
+        if (appointment == null) {
+            throw new BusinessException("挂号记录不存在");
+        }
+        
+        // 验证医生权限
+        if (!appointment.getDoctorId().equals(doctorId)) {
+            throw new BusinessException("无权查看该挂号记录的AI问诊信息");
+        }
+        
+        // 查询相关的AI问诊记录
+        LambdaQueryWrapper<AiConsultRecord> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(AiConsultRecord::getAppointmentId, appointmentId);
+        AiConsultRecord record = aiService.getOne(queryWrapper);
+        
+        if (record == null) {
+            log.info("挂号记录{}没有关联的AI问诊记录", appointmentId);
+            return null;
+        }
+        
+        // 构建会话ID（从数字recordId转为UUID格式）
+        String sessionId = UUID.randomUUID().toString();
+        try {
+            // 使用6位以上的数字，构建一个伪UUID格式
+            String hexString = Long.toHexString(record.getRecordId());
+            StringBuilder sb = new StringBuilder();
+            sb.append(hexString);
+            while (sb.length() < 32) {
+                sb.append("0");
+            }
+            // 按UUID格式插入连字符
+            sb.insert(8, "-");
+            sb.insert(13, "-");
+            sb.insert(18, "-");
+            sb.insert(23, "-");
+            sessionId = sb.toString();
+        } catch (Exception e) {
+            log.warn("构建会话ID失败", e);
+        }
+        
+        // 获取会话
+        return aiService.getConsultSession(sessionId);
+    }
+
+    @Override
+    public AppointmentVO getAppointmentDetail(Long appointmentId, Long doctorId) {
+        log.info("获取挂号记录详情, appointmentId: {}, doctorId: {}", appointmentId, doctorId);
+        
+        if (appointmentId == null) {
+            throw new BusinessException("挂号记录ID不能为空");
+        }
+        
+        if (doctorId == null) {
+            throw new BusinessException("医生ID不能为空");
+        }
+        
+        // 获取挂号记录
+        Appointment appointment = appointmentService.getById(appointmentId);
+        if (appointment == null) {
+            throw new BusinessException("挂号记录不存在");
+        }
+        
+        // 验证医生权限
+        if (!appointment.getDoctorId().equals(doctorId)) {
+            throw new BusinessException("无权查看该挂号记录");
+        }
+        
+        // 转换为VO
+        AppointmentVO vo = new AppointmentVO();
+        BeanUtils.copyProperties(appointment, vo);
+        
+        // 获取患者信息
+        Patient patient = patientService.getById(appointment.getPatientId());
+        if (patient != null) {
+            vo.setPatientName(patient.getName());
+        }
+        
+        // 获取医生信息
+        Doctor doctor = doctorService.getById(doctorId);
+        if (doctor != null) {
+            vo.setDoctorName(doctor.getName());
+            
+            // 获取医生所属的门诊和科室信息
+            if (doctor.getClinicId() != null) {
+                Clinic clinic = clinicService.getById(doctor.getClinicId());
+                if (clinic != null) {
+                    // 设置门诊名称
+                    vo.setClinicName(clinic.getClinicName());
+                    
+                    // 设置科室名称
+                    if (clinic.getDeptId() != null) {
+                        Department dept = departmentService.getById(clinic.getDeptId());
+                        if (dept != null) {
+                            vo.setDeptName(dept.getDeptName());
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 设置状态描述和是否可取消
+        vo.setStatusDesc(getStatusDesc(vo.getStatus()));
+        boolean canCancel = vo.getStatus() == 0 && 
+                          appointment.getAppointmentDate() != null && 
+                          appointment.getAppointmentDate().isAfter(LocalDate.now());
+        vo.setCanCancel(canCancel);
+        
+        // 查询关联的AI问诊记录
+        try {
+            LambdaQueryWrapper<AiConsultRecord> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(AiConsultRecord::getAppointmentId, appointmentId);
+            AiConsultRecord aiRecord = aiService.getOne(queryWrapper);
+            
+            if (aiRecord != null) {
+                // 构建会话ID（从数字recordId转为UUID格式）
+                String hexString = Long.toHexString(aiRecord.getRecordId());
+                StringBuilder sb = new StringBuilder();
+                sb.append(hexString);
+                while (sb.length() < 32) {
+                    sb.append("0");
+                }
+                // 按UUID格式插入连字符
+                sb.insert(8, "-");
+                sb.insert(13, "-");
+                sb.insert(18, "-");
+                sb.insert(23, "-");
+                vo.setAiConsultSessionId(sb.toString());
+            }
+        } catch (Exception e) {
+            log.warn("查询AI问诊记录异常", e);
+        }
+        
+        return vo;
     }
 
     /**

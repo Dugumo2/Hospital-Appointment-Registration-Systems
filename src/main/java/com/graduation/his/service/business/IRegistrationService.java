@@ -186,4 +186,20 @@ public interface IRegistrationService {
      * @return 预约记录VO列表
      */
     List<AppointmentVO> getDoctorAppointmentVOs(Long doctorId, LocalDate date, Integer status);
+    
+    /**
+     * 根据挂号记录ID查询该挂号绑定的AI问诊记录
+     * @param appointmentId 挂号记录ID
+     * @param doctorId 医生ID，用于验证操作权限
+     * @return AI问诊会话信息，如果没有AI问诊则返回null
+     */
+    ConsultSession getAiConsultByAppointmentId(Long appointmentId, Long doctorId);
+    
+    /**
+     * 获取挂号记录详情
+     * @param appointmentId 挂号记录ID
+     * @param doctorId 医生ID，用于验证操作权限
+     * @return 挂号记录详情
+     */
+    AppointmentVO getAppointmentDetail(Long appointmentId, Long doctorId);
 }
