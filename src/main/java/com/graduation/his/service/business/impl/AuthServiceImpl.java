@@ -12,6 +12,7 @@ import com.graduation.his.service.business.IAuthService;
 import com.graduation.his.service.entity.IPatientService;
 import com.graduation.his.service.entity.IUserService;
 import com.graduation.his.service.entity.MailService;
+import com.graduation.his.utils.minio.MinioUtils;
 import com.graduation.his.utils.redis.RedissonService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 
@@ -36,6 +38,7 @@ public class AuthServiceImpl implements IAuthService {
     private final RedissonService redissonService;
     private final IUserService userService;
     private final IPatientService patientService;
+    private final MinioUtils minioUtils;
     
     @Override
     public void sendEmailCode(String email) {
@@ -120,6 +123,8 @@ public class AuthServiceImpl implements IAuthService {
         user.setEmail(email);
         user.setPhone(registerDTO.getPhone());
         user.setRole(0); // 0-患者
+        // 设置默认头像
+        user.setAvatar(Constants.MinioConstants.DEFAULT_AVATAR_URL);
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
         userService.save(user);
@@ -258,6 +263,100 @@ public class AuthServiceImpl implements IAuthService {
         userVO.setUpdateTime(user.getUpdateTime());
         
         return userVO;
+    }
+    
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updatePassword(String oldPassword, String newPassword) {
+        // 验证参数
+        if (StringUtils.isBlank(oldPassword)) {
+            throw new BusinessException("原密码不能为空");
+        }
+        
+        if (StringUtils.isBlank(newPassword)) {
+            throw new BusinessException("新密码不能为空");
+        }
+        
+        // 校验是否登录
+        if (!StpUtil.isLogin()) {
+            throw new BusinessException("用户未登录");
+        }
+        
+        // 获取当前登录用户
+        Long userId = StpUtil.getLoginIdAsLong();
+        User user = userService.getById(userId);
+        
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        
+        // 验证原密码是否正确
+        String encryptedOldPassword = DigestUtils.md5Hex(oldPassword + Constants.SALT);
+        if (!encryptedOldPassword.equals(user.getPassword())) {
+            throw new BusinessException("原密码错误");
+        }
+        
+        // 更新密码
+        String encryptedNewPassword = DigestUtils.md5Hex(newPassword + Constants.SALT);
+        user.setPassword(encryptedNewPassword);
+        user.setUpdateTime(LocalDateTime.now());
+        userService.updateById(user);
+        
+        log.info("用户[{}]密码修改成功", user.getUsername());
+    }
+    
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String updateAvatar(MultipartFile file) {
+        // 校验参数
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("头像文件不能为空");
+        }
+        
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BusinessException("上传的文件不是图片类型");
+        }
+        
+        // 校验是否登录
+        if (!StpUtil.isLogin()) {
+            throw new BusinessException("用户未登录");
+        }
+        
+        // 获取当前登录用户
+        Long userId = StpUtil.getLoginIdAsLong();
+        User user = userService.getById(userId);
+        
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        
+        try {
+            // 获取旧头像URL
+            String oldAvatarUrl = user.getAvatar();
+            // 如果是默认头像，则设置为null，不删除默认头像
+            if (Constants.MinioConstants.DEFAULT_AVATAR_URL.equals(oldAvatarUrl)) {
+                oldAvatarUrl = null;
+            }
+            
+            // 上传新头像到MinIO
+            String avatarUrl = minioUtils.updateAvatar(
+                    Constants.MinioConstants.USER_AVATAR_BUCKET, 
+                    file, 
+                    oldAvatarUrl
+            );
+            
+            // 更新用户头像
+            user.setAvatar(avatarUrl);
+            user.setUpdateTime(LocalDateTime.now());
+            userService.updateById(user);
+            
+            log.info("用户[{}]头像更新成功", user.getUsername());
+            return avatarUrl;
+        } catch (Exception e) {
+            log.error("更新头像失败: {}", e.getMessage(), e);
+            throw new BusinessException("更新头像失败: " + e.getMessage());
+        }
     }
 }
 

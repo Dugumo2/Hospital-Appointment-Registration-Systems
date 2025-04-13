@@ -13,6 +13,21 @@ public class Constants {
     public static final String SALT = "HIS_SALT_2025#@!";
     
     /**
+     * MinIO存储相关常量
+     */
+    public static class MinioConstants {
+        /**
+         * 用户头像存储桶名称
+         */
+        public static final String USER_AVATAR_BUCKET = "his-user-avatars";
+        
+        /**
+         * 默认用户头像URL
+         */
+        public static final String DEFAULT_AVATAR_URL = "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png";
+    }
+    
+    /**
      * Redis Key前缀
      */
     public static class RedisKey {

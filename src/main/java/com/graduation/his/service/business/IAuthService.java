@@ -3,6 +3,7 @@ package com.graduation.his.service.business;
 import com.graduation.his.domain.dto.UserLoginDTO;
 import com.graduation.his.domain.dto.UserRegisterDTO;
 import com.graduation.his.domain.vo.UserVO;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * @author hua
@@ -48,4 +49,18 @@ public interface IAuthService {
      * @return 用户信息
      */
     UserVO getCurrentUserInfo();
+    
+    /**
+     * 修改用户密码
+     * @param oldPassword 旧密码
+     * @param newPassword 新密码
+     */
+    void updatePassword(String oldPassword, String newPassword);
+    
+    /**
+     * 更新用户头像
+     * @param file 头像文件
+     * @return 新的头像URL
+     */
+    String updateAvatar(MultipartFile file);
 }

@@ -8,6 +8,7 @@ import com.graduation.his.service.business.IAuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * @author hua
@@ -88,5 +89,28 @@ public class AuthController {
     public Result<UserVO> getCurrentUserInfo() {
         UserVO userVO = authService.getCurrentUserInfo();
         return Result.success(userVO);
+    }
+    
+    /**
+     * 修改密码
+     * @param oldPassword 旧密码
+     * @param newPassword 新密码
+     * @return 处理结果
+     */
+    @PostMapping("/updatePassword")
+    public Result<Void> updatePassword(@RequestParam String oldPassword, @RequestParam String newPassword) {
+        authService.updatePassword(oldPassword, newPassword);
+        return Result.success();
+    }
+    
+    /**
+     * 上传或更新用户头像
+     * @param file 头像文件
+     * @return 新的头像URL
+     */
+    @PostMapping("/updateAvatar")
+    public Result<String> updateAvatar(@RequestParam("file") MultipartFile file) {
+        String avatarUrl = authService.updateAvatar(file);
+        return Result.success(avatarUrl);
     }
 }

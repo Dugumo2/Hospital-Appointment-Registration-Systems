@@ -2,6 +2,7 @@ package com.graduation.his.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import com.graduation.his.common.Result;
+import com.graduation.his.domain.dto.DoctorDTO;
 import com.graduation.his.domain.po.Clinic;
 import com.graduation.his.domain.po.Department;
 import com.graduation.his.domain.po.Doctor;
@@ -10,6 +11,7 @@ import com.graduation.his.service.business.IAdminService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,22 +34,38 @@ public class AdminController {
     
     /**
      * 创建医生
-     * @param doctor 医生信息
+     * @param doctorInfo 医生基本信息（JSON格式）
+     * @param avatarFile 医生头像文件（可选）
      * @return 创建后的医生信息
      */
-    @PostMapping("/doctor")
-    public Result<Doctor> createDoctor(@RequestBody Doctor doctor) {
-        return Result.success(adminService.createDoctor(doctor));
+    @PostMapping(value = "/doctor", consumes = "multipart/form-data")
+    public Result<Doctor> createDoctor(
+            @RequestPart("doctorInfo") DoctorDTO doctorInfo,
+            @RequestPart(value = "avatarFile", required = false) MultipartFile avatarFile) {
+        
+        if (avatarFile != null) {
+            doctorInfo.setAvatarFile(avatarFile);
+        }
+        
+        return Result.success(adminService.createDoctor(doctorInfo));
     }
     
     /**
      * 更新医生
-     * @param doctor 医生信息
+     * @param doctorInfo 医生基本信息（JSON格式）
+     * @param avatarFile 医生头像文件（可选）
      * @return 更新结果
      */
-    @PutMapping("/doctor")
-    public Result<Boolean> updateDoctor(@RequestBody Doctor doctor) {
-        return Result.success(adminService.updateDoctor(doctor));
+    @PutMapping(value = "/doctor", consumes = "multipart/form-data")
+    public Result<Boolean> updateDoctor(
+            @RequestPart("doctorInfo") DoctorDTO doctorInfo,
+            @RequestPart(value = "avatarFile", required = false) MultipartFile avatarFile) {
+        
+        if (avatarFile != null) {
+            doctorInfo.setAvatarFile(avatarFile);
+        }
+        
+        return Result.success(adminService.updateDoctor(doctorInfo));
     }
     
     /**

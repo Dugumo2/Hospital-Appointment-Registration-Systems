@@ -2,21 +2,28 @@ package com.graduation.his.service.business.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.graduation.his.common.Constants;
 import com.graduation.his.exception.BusinessException;
+import com.graduation.his.domain.dto.DoctorDTO;
 import com.graduation.his.domain.po.Clinic;
 import com.graduation.his.domain.po.Department;
 import com.graduation.his.domain.po.Doctor;
 import com.graduation.his.domain.po.Schedule;
+import com.graduation.his.domain.po.User;
 import com.graduation.his.service.business.IAdminService;
 import com.graduation.his.service.entity.IClinicService;
 import com.graduation.his.service.entity.IDepartmentService;
 import com.graduation.his.service.entity.IDoctorService;
 import com.graduation.his.service.entity.IScheduleService;
+import com.graduation.his.service.entity.IUserService;
+import com.graduation.his.utils.minio.MinioUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -44,43 +51,110 @@ public class AdminServiceImpl implements IAdminService {
     
     @Autowired
     private IClinicService clinicService;
+    
+    @Autowired
+    private IUserService userService;
+    
+    @Autowired
+    private MinioUtils minioUtils;
 
     // ---------- 医生信息管理 ----------
     
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Doctor createDoctor(Doctor doctor) {
-        log.info("创建医生信息: {}", doctor);
+    public Doctor createDoctor(DoctorDTO doctorDTO) {
+        log.info("创建医生信息: {}", doctorDTO);
         
-        if (doctor == null) {
+        if (doctorDTO == null) {
             throw new BusinessException("医生信息不能为空");
         }
         
         // 数据验证
-        if (doctor.getUserId() == null) {
-            throw new BusinessException("用户ID不能为空");
-        }
-        
-        if (StringUtils.isBlank(doctor.getName())) {
+        if (StringUtils.isBlank(doctorDTO.getName())) {
             throw new BusinessException("医生姓名不能为空");
         }
         
+        if (StringUtils.isBlank(doctorDTO.getUsername())) {
+            throw new BusinessException("用户名不能为空");
+        }
+        
+        if (StringUtils.isBlank(doctorDTO.getPassword())) {
+            throw new BusinessException("密码不能为空");
+        }
+        
+        if (doctorDTO.getClinicId() == null) {
+            throw new BusinessException("门诊ID不能为空");
+        }
+        
         // 检查门诊是否存在
-        if (doctor.getClinicId() != null) {
-            Clinic clinic = clinicService.getById(doctor.getClinicId());
-            if (clinic == null) {
-                throw new BusinessException("门诊不存在");
-            }
-            
-            // 通过门诊关联获取科室
-            Department department = departmentService.getById(clinic.getDeptId());
-            if (department == null) {
-                throw new BusinessException("门诊关联的科室不存在");
+        Clinic clinic = clinicService.getById(doctorDTO.getClinicId());
+        if (clinic == null) {
+            throw new BusinessException("门诊不存在");
+        }
+        
+        // 通过门诊关联获取科室
+        Department department = departmentService.getById(clinic.getDeptId());
+        if (department == null) {
+            throw new BusinessException("门诊关联的科室不存在");
+        }
+        
+        // 检查用户名是否已存在
+        User existingUser = userService.getByUsername(doctorDTO.getUsername());
+        if (existingUser != null) {
+            throw new BusinessException("用户名已存在");
+        }
+        
+        // 检查邮箱是否已存在
+        if (StringUtils.isNotBlank(doctorDTO.getEmail())) {
+            existingUser = userService.getByEmail(doctorDTO.getEmail());
+            if (existingUser != null) {
+                throw new BusinessException("邮箱已存在");
             }
         }
         
-        // 设置创建时间和更新时间
+        // 当前时间
         LocalDateTime now = LocalDateTime.now();
+        
+        // 创建用户账号
+        User user = new User();
+        user.setUsername(doctorDTO.getUsername());
+        user.setPassword(DigestUtils.md5Hex(doctorDTO.getPassword() + Constants.SALT)); // 密码加盐哈希
+        user.setEmail(doctorDTO.getEmail());
+        user.setPhone(doctorDTO.getPhone());
+        user.setRole(1); // 1-医生角色
+        
+        // 设置默认头像
+        user.setAvatar(Constants.MinioConstants.DEFAULT_AVATAR_URL);
+        
+        user.setCreateTime(now);
+        user.setUpdateTime(now);
+        
+        // 保存用户信息
+        userService.save(user);
+        
+        // 处理头像上传
+        if (doctorDTO.getAvatarFile() != null && !doctorDTO.getAvatarFile().isEmpty()) {
+            try {
+                MultipartFile avatarFile = doctorDTO.getAvatarFile();
+                String avatarUrl = minioUtils.uploadAvatar(
+                        Constants.MinioConstants.USER_AVATAR_BUCKET, 
+                        avatarFile
+                );
+                user.setAvatar(avatarUrl);
+                userService.updateById(user);
+            } catch (Exception e) {
+                log.error("上传医生头像失败", e);
+                // 不阻止创建医生，继续使用默认头像
+            }
+        }
+        
+        // 创建医生信息
+        Doctor doctor = new Doctor();
+        doctor.setUserId(user.getId());
+        doctor.setName(doctorDTO.getName());
+        doctor.setClinicId(doctorDTO.getClinicId());
+        doctor.setTitle(doctorDTO.getTitle());
+        doctor.setIntroduction(doctorDTO.getIntroduction());
         doctor.setCreateTime(now);
         doctor.setUpdateTime(now);
         
@@ -94,26 +168,32 @@ public class AdminServiceImpl implements IAdminService {
     
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean updateDoctor(Doctor doctor) {
-        log.info("更新医生信息: {}", doctor);
+    public boolean updateDoctor(DoctorDTO doctorDTO) {
+        log.info("更新医生信息: {}", doctorDTO);
         
-        if (doctor == null) {
+        if (doctorDTO == null) {
             throw new BusinessException("医生信息不能为空");
         }
         
-        if (doctor.getDoctorId() == null) {
+        if (doctorDTO.getDoctorId() == null) {
             throw new BusinessException("医生ID不能为空");
         }
         
         // 检查医生是否存在
-        Doctor existingDoctor = doctorService.getById(doctor.getDoctorId());
+        Doctor existingDoctor = doctorService.getById(doctorDTO.getDoctorId());
         if (existingDoctor == null) {
             throw new BusinessException("医生不存在");
         }
         
+        // 获取关联的用户信息
+        User existingUser = userService.getById(existingDoctor.getUserId());
+        if (existingUser == null) {
+            throw new BusinessException("关联的用户账号不存在");
+        }
+        
         // 检查门诊是否存在
-        if (doctor.getClinicId() != null) {
-            Clinic clinic = clinicService.getById(doctor.getClinicId());
+        if (doctorDTO.getClinicId() != null) {
+            Clinic clinic = clinicService.getById(doctorDTO.getClinicId());
             if (clinic == null) {
                 throw new BusinessException("门诊不存在");
             }
@@ -125,13 +205,103 @@ public class AdminServiceImpl implements IAdminService {
             }
         }
         
-        // 设置更新时间
-        doctor.setUpdateTime(LocalDateTime.now());
+        // 当前时间
+        LocalDateTime now = LocalDateTime.now();
+        boolean userInfoChanged = false;
+        
+        // 更新用户账号信息
+        if (StringUtils.isNotBlank(doctorDTO.getUsername()) && !doctorDTO.getUsername().equals(existingUser.getUsername())) {
+            // 检查用户名是否已存在
+            User userByUsername = userService.getByUsername(doctorDTO.getUsername());
+            if (userByUsername != null && !userByUsername.getId().equals(existingUser.getId())) {
+                throw new BusinessException("用户名已存在");
+            }
+            existingUser.setUsername(doctorDTO.getUsername());
+            userInfoChanged = true;
+        }
+        
+        if (StringUtils.isNotBlank(doctorDTO.getPassword())) {
+            existingUser.setPassword(DigestUtils.md5Hex(doctorDTO.getPassword() + Constants.SALT));
+            userInfoChanged = true;
+        }
+        
+        if (StringUtils.isNotBlank(doctorDTO.getEmail()) && !doctorDTO.getEmail().equals(existingUser.getEmail())) {
+            // 检查邮箱是否已存在
+            User userByEmail = userService.getByEmail(doctorDTO.getEmail());
+            if (userByEmail != null && !userByEmail.getId().equals(existingUser.getId())) {
+                throw new BusinessException("邮箱已存在");
+            }
+            existingUser.setEmail(doctorDTO.getEmail());
+            userInfoChanged = true;
+        }
+        
+        if (StringUtils.isNotBlank(doctorDTO.getPhone()) && !doctorDTO.getPhone().equals(existingUser.getPhone())) {
+            existingUser.setPhone(doctorDTO.getPhone());
+            userInfoChanged = true;
+        }
+        
+        // 处理头像更新
+        if (doctorDTO.getAvatarFile() != null && !doctorDTO.getAvatarFile().isEmpty()) {
+            try {
+                MultipartFile avatarFile = doctorDTO.getAvatarFile();
+                
+                // 获取旧头像URL
+                String oldAvatarUrl = existingUser.getAvatar();
+                // 如果是默认头像，则设置为null，不删除默认头像
+                if (Constants.MinioConstants.DEFAULT_AVATAR_URL.equals(oldAvatarUrl)) {
+                    oldAvatarUrl = null;
+                }
+                
+                String avatarUrl = minioUtils.updateAvatar(
+                        Constants.MinioConstants.USER_AVATAR_BUCKET, 
+                        avatarFile, 
+                        oldAvatarUrl
+                );
+                existingUser.setAvatar(avatarUrl);
+                userInfoChanged = true;
+            } catch (Exception e) {
+                log.error("更新医生头像失败", e);
+                // 不阻止更新医生，继续使用原头像
+            }
+        }
+        
+        if (userInfoChanged) {
+            existingUser.setUpdateTime(now);
+            userService.updateById(existingUser);
+        }
         
         // 更新医生信息
-        boolean result = doctorService.updateById(doctor);
+        boolean doctorInfoChanged = false;
+        Doctor doctorToUpdate = new Doctor();
+        doctorToUpdate.setDoctorId(doctorDTO.getDoctorId());
         
-        log.info("医生信息更新 {}, ID: {}", result ? "成功" : "失败", doctor.getDoctorId());
+        if (StringUtils.isNotBlank(doctorDTO.getName()) && !doctorDTO.getName().equals(existingDoctor.getName())) {
+            doctorToUpdate.setName(doctorDTO.getName());
+            doctorInfoChanged = true;
+        }
+        
+        if (doctorDTO.getClinicId() != null && !doctorDTO.getClinicId().equals(existingDoctor.getClinicId())) {
+            doctorToUpdate.setClinicId(doctorDTO.getClinicId());
+            doctorInfoChanged = true;
+        }
+        
+        if (StringUtils.isNotBlank(doctorDTO.getTitle()) && !doctorDTO.getTitle().equals(existingDoctor.getTitle())) {
+            doctorToUpdate.setTitle(doctorDTO.getTitle());
+            doctorInfoChanged = true;
+        }
+        
+        if (StringUtils.isNotBlank(doctorDTO.getIntroduction()) && !doctorDTO.getIntroduction().equals(existingDoctor.getIntroduction())) {
+            doctorToUpdate.setIntroduction(doctorDTO.getIntroduction());
+            doctorInfoChanged = true;
+        }
+        
+        boolean result = true;
+        if (doctorInfoChanged) {
+            doctorToUpdate.setUpdateTime(now);
+            result = doctorService.updateById(doctorToUpdate);
+        }
+        
+        log.info("医生信息更新 {}, ID: {}", result ? "成功" : "失败", doctorDTO.getDoctorId());
         
         return result;
     }
@@ -160,12 +330,41 @@ public class AdminServiceImpl implements IAdminService {
             throw new BusinessException("该医生有关联的排班，无法删除");
         }
         
+        // 获取关联的用户ID
+        Long userId = doctor.getUserId();
+        
         // 删除医生信息
-        boolean result = doctorService.removeById(doctorId);
+        boolean doctorResult = doctorService.removeById(doctorId);
         
-        log.info("医生信息删除 {}, ID: {}", result ? "成功" : "失败", doctorId);
+        if (doctorResult && userId != null) {
+            // 删除用户账号
+            User user = userService.getById(userId);
+            
+            if (user != null) {
+                // 如果用户头像不是默认头像，则删除头像
+                try {
+                    String avatar = user.getAvatar();
+                    if (StringUtils.isNotBlank(avatar) && !Constants.MinioConstants.DEFAULT_AVATAR_URL.equals(avatar)) {
+                        String objectName = minioUtils.extractObjectNameFromUrl(avatar);
+                        if (objectName != null) {
+                            minioUtils.removeFile(Constants.MinioConstants.USER_AVATAR_BUCKET, objectName);
+                            log.info("已删除医生头像: {}", objectName);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("删除医生头像失败", e);
+                    // 不阻止删除用户，继续执行
+                }
+                
+                // 删除用户账号
+                boolean userResult = userService.removeById(userId);
+                log.info("用户账号删除 {}, ID: {}", userResult ? "成功" : "失败", userId);
+            }
+        }
         
-        return result;
+        log.info("医生信息删除 {}, ID: {}", doctorResult ? "成功" : "失败", doctorId);
+        
+        return doctorResult;
     }
     
     @Override
@@ -327,30 +526,34 @@ public class AdminServiceImpl implements IAdminService {
             throw new BusinessException("科室已经是无效状态");
         }
         
-        // 检查是否有关联的门诊
+        // 获取该科室下的所有门诊
         LambdaQueryWrapper<Clinic> clinicQuery = new LambdaQueryWrapper<>();
         clinicQuery.eq(Clinic::getDeptId, deptId);
-        long clinicCount = clinicService.count(clinicQuery);
+        List<Clinic> clinics = clinicService.list(clinicQuery);
         
-        if (clinicCount > 0) {
-            // 获取所有关联的门诊
-            List<Clinic> clinics = clinicService.list(clinicQuery.select(Clinic::getClinicId));
+        if (!clinics.isEmpty()) {
+            // 获取所有门诊ID
             List<Long> clinicIds = clinics.stream()
                     .map(Clinic::getClinicId)
                     .collect(Collectors.toList());
                     
             // 检查是否有关联的医生
-            if (!clinicIds.isEmpty()) {
-                LambdaQueryWrapper<Doctor> doctorQuery = new LambdaQueryWrapper<>();
-                doctorQuery.in(Doctor::getClinicId, clinicIds);
-                long doctorCount = doctorService.count(doctorQuery);
-                
-                if (doctorCount > 0) {
-                    throw new BusinessException("该科室有关联的医生，无法删除");
-                }
+            LambdaQueryWrapper<Doctor> doctorQuery = new LambdaQueryWrapper<>();
+            doctorQuery.in(Doctor::getClinicId, clinicIds);
+            long doctorCount = doctorService.count(doctorQuery);
+            
+            if (doctorCount > 0) {
+                throw new BusinessException("该科室有关联的医生，无法删除");
             }
             
-            throw new BusinessException("该科室有关联的门诊，无法删除");
+            // 逻辑删除该科室下的所有门诊
+            LambdaUpdateWrapper<Clinic> clinicUpdateWrapper = new LambdaUpdateWrapper<>();
+            clinicUpdateWrapper.in(Clinic::getClinicId, clinicIds)
+                    .set(Clinic::getIsActive, 0)
+                    .set(Clinic::getUpdateTime, LocalDateTime.now());
+            clinicService.update(clinicUpdateWrapper);
+            
+            log.info("已逻辑删除科室 {} 下的 {} 个门诊", deptId, clinics.size());
         }
         
         // 修改为无效状态
@@ -414,35 +617,30 @@ public class AdminServiceImpl implements IAdminService {
             throw new BusinessException("科室不存在");
         }
         
-        // 检查科室是否为无效状态
-        if (department.getIsActive() == 1) {
-            throw new BusinessException("有效科室不能物理删除，请先执行逻辑删除");
-        }
-        
-        // 检查是否有关联的门诊
+        // 获取该科室下的所有门诊
         LambdaQueryWrapper<Clinic> clinicQuery = new LambdaQueryWrapper<>();
         clinicQuery.eq(Clinic::getDeptId, deptId);
-        long clinicCount = clinicService.count(clinicQuery);
+        List<Clinic> clinics = clinicService.list(clinicQuery);
         
-        if (clinicCount > 0) {
-            // 获取所有关联的门诊
-            List<Clinic> clinics = clinicService.list(clinicQuery.select(Clinic::getClinicId));
+        if (!clinics.isEmpty()) {
+            // 获取所有门诊ID
             List<Long> clinicIds = clinics.stream()
                     .map(Clinic::getClinicId)
                     .collect(Collectors.toList());
                     
             // 检查是否有关联的医生
-            if (!clinicIds.isEmpty()) {
-                LambdaQueryWrapper<Doctor> doctorQuery = new LambdaQueryWrapper<>();
-                doctorQuery.in(Doctor::getClinicId, clinicIds);
-                long doctorCount = doctorService.count(doctorQuery);
-                
-                if (doctorCount > 0) {
-                    throw new BusinessException("该科室有关联的医生，无法删除");
-                }
+            LambdaQueryWrapper<Doctor> doctorQuery = new LambdaQueryWrapper<>();
+            doctorQuery.in(Doctor::getClinicId, clinicIds);
+            long doctorCount = doctorService.count(doctorQuery);
+            
+            if (doctorCount > 0) {
+                throw new BusinessException("该科室有关联的医生，无法删除");
             }
             
-            throw new BusinessException("该科室有关联的门诊，无法删除");
+            // 物理删除该科室下的所有门诊
+            clinicService.removeByIds(clinicIds);
+            
+            log.info("已物理删除科室 {} 下的 {} 个门诊", deptId, clinics.size());
         }
         
         // 执行物理删除
@@ -703,11 +901,6 @@ public class AdminServiceImpl implements IAdminService {
         Clinic clinic = clinicService.getById(clinicId);
         if (clinic == null) {
             throw new BusinessException("门诊不存在");
-        }
-        
-        // 检查门诊是否为无效状态
-        if (clinic.getIsActive() == 1) {
-            throw new BusinessException("有效门诊不能物理删除，请先执行逻辑删除");
         }
         
         // 检查是否有关联的医生

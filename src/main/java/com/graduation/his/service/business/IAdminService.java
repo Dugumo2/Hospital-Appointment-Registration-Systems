@@ -1,5 +1,6 @@
 package com.graduation.his.service.business;
 
+import com.graduation.his.domain.dto.DoctorDTO;
 import com.graduation.his.domain.po.Clinic;
 import com.graduation.his.domain.po.Department;
 import com.graduation.his.domain.po.Doctor;
@@ -20,17 +21,17 @@ public interface IAdminService {
     
     /**
      * 创建医生信息
-     * @param doctor 医生信息
+     * @param doctorDTO 医生信息（包含用户账号、密码、头像等）
      * @return 创建后的医生信息
      */
-    Doctor createDoctor(Doctor doctor);
+    Doctor createDoctor(DoctorDTO doctorDTO);
     
     /**
      * 更新医生信息
-     * @param doctor 医生信息
+     * @param doctorDTO 医生信息
      * @return 是否更新成功
      */
-    boolean updateDoctor(Doctor doctor);
+    boolean updateDoctor(DoctorDTO doctorDTO);
     
     /**
      * 删除医生信息
