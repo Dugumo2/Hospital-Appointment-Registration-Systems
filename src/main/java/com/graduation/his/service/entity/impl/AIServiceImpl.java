@@ -193,17 +193,15 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
     }
     
     @Override
-    public SseEmitter createSseConnection(AiConsultConnectionRequest request) {
+    public SseEmitter createSseConnection(String sessionId, Long patientId, Long appointmentId) {
         // 验证必要参数
-        if (request.getPatientId() == null) {
+        if (patientId == null) {
             throw new IllegalArgumentException("患者ID不能为空");
         }
-        if (request.getAppointmentId() == null) {
+        if (appointmentId == null) {
             throw new IllegalArgumentException("预约ID不能为空");
         }
         
-        String sessionId = request.getSessionId();
-        Long patientId = request.getPatientId();
         boolean isNewSession = false;
         
         // 如果sessionId为空，创建新的会话ID
@@ -253,7 +251,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
             ConsultSession session = ConsultSession.builder()
                     .sessionId(sessionId)
                     .patientId(patientId)
-                    .appointmentId(request.getAppointmentId())
+                    .appointmentId(appointmentId)
                     .status(0) // 进行中
                     .version(0) // 初始化版本号
                     .messageHistory(new ArrayList<>())
@@ -284,7 +282,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
             if (!patientId.equals(existingSession.getPatientId())) {
                 throw new IllegalArgumentException("会话关联的患者ID与当前用户不匹配");
             }
-            if (!request.getAppointmentId().equals(existingSession.getAppointmentId())) {
+            if (!appointmentId.equals(existingSession.getAppointmentId())) {
                 throw new IllegalArgumentException("会话关联的预约ID与请求不匹配");
             }
         }
