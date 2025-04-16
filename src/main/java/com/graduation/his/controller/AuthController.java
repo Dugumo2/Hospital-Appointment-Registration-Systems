@@ -29,7 +29,7 @@ public class AuthController {
      * @param email 邮箱地址
      * @return 处理结果
      */
-    @PostMapping("/email")
+    @GetMapping("/email")
     public Result<Void> sendEmailCode(@RequestParam String email) {
         authService.sendEmailCode(email);
         return Result.success();
