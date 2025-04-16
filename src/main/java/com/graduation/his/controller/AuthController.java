@@ -18,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
     
@@ -29,7 +29,7 @@ public class AuthController {
      * @param email 邮箱地址
      * @return 处理结果
      */
-    @PostMapping("/sendEmailCode")
+    @PostMapping("/email")
     public Result<Void> sendEmailCode(@RequestParam String email) {
         authService.sendEmailCode(email);
         return Result.success();
@@ -41,7 +41,7 @@ public class AuthController {
      * @param email 邮箱
      * @return 是否存在
      */
-    @GetMapping("/checkUserExists")
+    @GetMapping("/IsExists")
     public Result<Boolean> checkUserExists(
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String email) {
