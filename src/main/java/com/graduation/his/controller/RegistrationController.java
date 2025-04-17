@@ -3,6 +3,7 @@ package com.graduation.his.controller;
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
 import com.graduation.his.common.Result;
+import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
 import com.graduation.his.domain.po.*;
@@ -114,22 +115,17 @@ public class RegistrationController {
      * 创建Server-Sent Events连接，用于实时接收AI问诊响应
      * 会话状态会存储在Redis中，有效期为6小时
      * 
-     * @param sessionId 会话ID（首次对话为空）
-     * @param appointmentId 预约ID（必填）
-     * @param patientId 患者ID（必填）
+     * @param request 连接请求(包含会话ID、预约ID和患者ID)
      * @return SSE连接
      */
     @SaCheckRole("patient")
-    @GetMapping(value = "/ai-consult/connect", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter createAiConsultConnection(
-            @RequestParam(required = false) String sessionId,
-            @RequestParam Long appointmentId,
-            @RequestParam Long patientId) {
+    @PostMapping(value = "/ai-consult/connect", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter createAiConsultConnection(@RequestBody AiConsultConnectionRequest request) {
         log.info("接收到创建AI问诊SSE连接请求, appointmentId: {}, patientId: {}, sessionId: {}", 
-                appointmentId, patientId, sessionId);
+                request.getAppointmentId(), request.getPatientId(), request.getSessionId());
         
         try {
-            return registrationService.createAiConsultConnection(sessionId, appointmentId, patientId);
+            return registrationService.createAiConsultConnection(request);
         } catch (IllegalArgumentException e) {
             log.error("创建AI问诊SSE连接参数错误: {}", e.getMessage());
             throw e;

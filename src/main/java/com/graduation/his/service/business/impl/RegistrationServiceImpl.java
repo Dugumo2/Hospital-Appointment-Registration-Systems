@@ -3,6 +3,7 @@ package com.graduation.his.service.business.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.graduation.his.exception.BusinessException;
+import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
 import com.graduation.his.domain.po.AiConsultRecord;
@@ -65,20 +66,20 @@ public class RegistrationServiceImpl implements IRegistrationService {
     private IPatientService patientService;
     
     @Override
-    public SseEmitter createAiConsultConnection(String sessionId, Long appointmentId, Long patientId) {
+    public SseEmitter createAiConsultConnection(AiConsultConnectionRequest request) {
         log.info("创建AI问诊SSE连接, appointmentId: {}, patientId: {}, sessionId: {}", 
-                appointmentId, patientId, sessionId);
+                request.getAppointmentId(), request.getPatientId(), request.getSessionId());
         
         // 验证参数
-        if (appointmentId == null) {
+        if (request.getAppointmentId() == null) {
             throw new IllegalArgumentException("预约ID不能为空");
         }
-        if (patientId == null) {
+        if (request.getPatientId() == null) {
             throw new IllegalArgumentException("患者ID不能为空");
         }
         
         // 调用AI服务创建连接
-        return aiService.createSseConnection(sessionId, appointmentId, patientId);
+        return aiService.createSseConnection(request);
     }
     
     @Override
