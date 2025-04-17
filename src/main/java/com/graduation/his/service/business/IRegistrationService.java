@@ -1,6 +1,5 @@
 package com.graduation.his.service.business;
 
-import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
 import com.graduation.his.domain.po.Appointment;
@@ -29,10 +28,12 @@ public interface IRegistrationService {
     
     /**
      * 创建AI问诊SSE连接
-     * @param request 连接请求(包含会话ID、预约ID和患者ID)
+     * @param sessionId 会话ID，首次对话为null
+     * @param appointmentId 预约ID，必填
+     * @param patientId 患者ID，必填
      * @return SSE连接对象
      */
-    SseEmitter createAiConsultConnection(AiConsultConnectionRequest request);
+    SseEmitter createAiConsultConnection(String sessionId, Long appointmentId, Long patientId);
     
     /**
      * 发送AI问诊请求
