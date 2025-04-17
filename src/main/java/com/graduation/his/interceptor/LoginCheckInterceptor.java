@@ -2,7 +2,7 @@ package com.graduation.his.interceptor;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.alibaba.fastjson2.JSONObject;
-import com.graduation.his.domain.vo.Result;
+import com.graduation.his.common.Result;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +28,7 @@ public class LoginCheckInterceptor implements HandlerInterceptor {
             log.info("Token不存在");
 
             //创建响应结果对象
-            Result responseResult = Result.fail("NOT_LOGIN");
+            Result responseResult = Result.error("NOT_LOGIN");
             //把Result对象转换为JSON格式字符串
             String json = JSONObject.toJSONString(responseResult);
             //设置响应头（告知浏览器：响应的数据类型为json、响应的数据编码表为utf-8）

@@ -1,7 +1,7 @@
 package com.graduation.his.handler;
 
 import cn.dev33.satoken.exception.NotLoginException;
-import com.graduation.his.domain.vo.Result;
+import com.graduation.his.common.Result;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -14,7 +14,7 @@ public class GlobalExceptionHandler {
         e.printStackTrace();//打印堆栈中的异常信息
 
         //捕获到异常之后，响应一个标准的Result
-        return Result.fail("对不起,操作失败,请联系管理员");
+        return Result.error("对不起,操作失败,请联系管理员");
     }
 
     // 全局异常拦截（拦截项目中的NotLoginException异常）
@@ -49,7 +49,7 @@ public class GlobalExceptionHandler {
         }
 
         // 返回给前端
-        return Result.fail(message);
+        return Result.error(message);
     }
 
 }
