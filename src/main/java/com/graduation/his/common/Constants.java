@@ -58,4 +58,24 @@ public class Constants {
          */
         public static final String FEEDBACK_MESSAGE_QUEUE = "hros.topic";
     }
+    
+    /**
+     * AI服务相关常量
+     */
+    public static class AIConstants {
+        /**
+         * 会话过期时间（6小时）
+         */
+        public static final long SESSION_EXPIRE_HOURS = 1;
+        
+        /**
+         * 分布式锁等待时间（秒）
+         */
+        public static final long LOCK_WAIT_TIME = 5;
+        
+        /**
+         * 分布式锁租约时间（秒）
+         */
+        public static final long LOCK_LEASE_TIME = 10;
+    }
 }

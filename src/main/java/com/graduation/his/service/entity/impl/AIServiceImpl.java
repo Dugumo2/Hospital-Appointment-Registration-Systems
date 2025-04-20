@@ -57,16 +57,6 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
     // Redis服务
     @Autowired
     private IRedisService redisService;
-    
-    // 会话过期时间（6小时）
-    private static final long SESSION_EXPIRE_HOURS = 6;
-    
-    // 分布式锁等待时间（秒）
-    private static final long LOCK_WAIT_TIME = 5;
-    
-    // 分布式锁租约时间（秒）
-    private static final long LOCK_LEASE_TIME = 10;
-
 
     // WebClient实例，用于发送HTTP请求
     private final WebClient webClient;
@@ -102,7 +92,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
         RMap<String, Object> sessionMap = redisService.getMap(redisKey);
         
         // 重置过期时间
-        sessionMap.expire(Duration.ofHours(SESSION_EXPIRE_HOURS));
+        sessionMap.expire(Duration.ofHours(Constants.AIConstants.SESSION_EXPIRE_HOURS));
         
         return sessionMap;
     }
@@ -126,7 +116,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
         RLock lock = getSessionLock(session.getSessionId());
         try {
             // 尝试获取锁，等待5秒，10秒后自动释放
-            if (lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS)) {
+            if (lock.tryLock(Constants.AIConstants.LOCK_WAIT_TIME, Constants.AIConstants.LOCK_LEASE_TIME, TimeUnit.SECONDS)) {
                 try {
                     RMap<String, Object> sessionMap = getSessionMap(session.getSessionId());
                     sessionMap.put("sessionId", session.getSessionId());
@@ -157,7 +147,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
         
         RLock lock = getSessionLock(sessionId);
         try {
-            if (lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS)) {
+            if (lock.tryLock(Constants.AIConstants.LOCK_WAIT_TIME, Constants.AIConstants.LOCK_LEASE_TIME, TimeUnit.SECONDS)) {
                 try {
                     RMap<String, Object> sessionMap = getSessionMap(sessionId);
                     if (sessionMap.isEmpty()) {
@@ -472,6 +462,13 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
      */
     private void handleAIResponse(String response, ConsultSession session) {
         try {
+            // 检查是否是结束标记
+            if (response.trim().equals("[DONE]")) {
+                // 这只是流结束标记，不需要处理
+                log.info("接收到流结束标记 [DONE], sessionId: {}", session.getSessionId());
+                return;
+            }
+
             // 解析响应JSON
             JSONObject jsonResponse = JSON.parseObject(response);
             
@@ -532,7 +529,7 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
         if (currentContent == null) {
             currentContent = "";
         }
-        redisService.setValue(redisKey, currentContent + content, TimeUnit.HOURS.toSeconds(SESSION_EXPIRE_HOURS));
+        redisService.setValue(redisKey, currentContent + content, TimeUnit.HOURS.toSeconds(Constants.AIConstants.SESSION_EXPIRE_HOURS));
     }
     
     /**
@@ -673,19 +670,23 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
                     record.setPatientId(session.getPatientId());
                     record.setAppointmentId(session.getAppointmentId());
                     record.setStatus(session.getStatus());
+                    record.setConversation(conversationJson);
                     record.setCreateTime(LocalDateTime.now());
                     record.setVersion(0);
+
+                    // 对新记录使用save或insert方法
+                    updated = save(record);
+                }else {
+
+                    // 更新会话内容和状态
+                    record.setConversation(conversationJson);
+                    record.setUpdateTime(LocalDateTime.now());
+
+                    // 使用乐观锁更新
+                    updated = update(record, new LambdaUpdateWrapper<AiConsultRecord>()
+                            .eq(AiConsultRecord::getRecordId, recordId)
+                            .eq(AiConsultRecord::getVersion, record.getVersion()));
                 }
-                
-                // 更新会话内容和状态
-                record.setConversation(conversationJson);
-                record.setUpdateTime(LocalDateTime.now());
-                
-                // 使用乐观锁更新
-                updated = update(record, new LambdaUpdateWrapper<AiConsultRecord>()
-                        .eq(AiConsultRecord::getRecordId, recordId)
-                        .eq(AiConsultRecord::getVersion, record.getVersion()));
-                
                 if (!updated) {
                     retryCount++;
                     if (retryCount < maxRetries) {
