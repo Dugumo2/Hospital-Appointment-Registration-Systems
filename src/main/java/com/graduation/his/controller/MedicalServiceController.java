@@ -93,7 +93,7 @@ public class MedicalServiceController {
      * @param diagId 诊断ID
      * @return 诊断详情
      */
-    @SaCheckRole(value = {"doctor,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"doctor", "patient"},mode = SaMode.OR)
     @GetMapping("/diagnoses/{diagId}")
     public Result<DiagnosisVO> getDiagnosisDetail(@PathVariable Long diagId) {
         log.info("获取诊断详情, diagId: {}", diagId);
@@ -124,7 +124,7 @@ public class MedicalServiceController {
      * @param diagId 诊断ID
      * @return 反馈消息列表
      */
-    @SaCheckRole(value = {"doctor,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"doctor", "patient"},mode = SaMode.OR)
     @GetMapping("/diagnoses/{diagId}/feedback")
     public Result<List<FeedbackMessageDTO>> getFeedbackMessages(@PathVariable Long diagId) {
         log.info("获取诊断相关的所有反馈消息, diagId: {}", diagId);
@@ -164,7 +164,7 @@ public class MedicalServiceController {
      * @param content 消息内容
      * @return 反馈消息
      */
-    @SaCheckRole(value = {"doctor,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"doctor", "patient"},mode = SaMode.OR)
     @PostMapping("/diagnoses/{diagId}/feedback")
     public Result<FeedbackMessageDTO> sendFeedbackMessage(@PathVariable Long diagId, @RequestParam String content) {
         log.info("发送诊后反馈消息, diagId: {}, content: {}", diagId, content);
@@ -213,7 +213,7 @@ public class MedicalServiceController {
      * @param messageId 消息ID
      * @return 是否成功
      */
-    @SaCheckRole(value = {"doctor,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"doctor", "patient"},mode = SaMode.OR)
     @PostMapping("/feedback/{messageId}/read")
     public Result<Boolean> markMessageAsRead(@PathVariable Long messageId) {
         log.info("标记消息为已读, messageId: {}", messageId);
@@ -234,7 +234,7 @@ public class MedicalServiceController {
      * 
      * @return 未读消息数量
      */
-    @SaCheckRole(value = {"doctor,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"doctor", "patient"},mode = SaMode.OR)
     @GetMapping("/feedback/unread/count")
     public Result<Integer> getUnreadMessageCount() {
         try {

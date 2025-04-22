@@ -48,7 +48,7 @@ public class RegistrationController {
      * @param onlyActive 是否只返回有效科室 (可选，默认true)
      * @return 科室列表
      */
-    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"admin","patient"},mode = SaMode.OR)
     @GetMapping("/departments")
     public Result<List<Department>> getDepartmentList(
             @RequestParam(required = false, defaultValue = "true") boolean onlyActive) {
@@ -69,7 +69,7 @@ public class RegistrationController {
      * @param onlyActive 是否只返回有效门诊 (可选，默认true)
      * @return 门诊列表
      */
-    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"admin","patient"},mode = SaMode.OR)
     @GetMapping("/clinics")
     public Result<List<Clinic>> getClinicList(
             @RequestParam(required = false) Long deptId,
@@ -91,7 +91,7 @@ public class RegistrationController {
      * @param onlyActive 是否只返回有效门诊 (可选，默认true)
      * @return 门诊列表
      */
-    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"admin","patient"},mode = SaMode.OR)
     @GetMapping("/clinics/search")
     public Result<List<Clinic>> searchClinicByName(
             @RequestParam String name,
@@ -223,7 +223,7 @@ public class RegistrationController {
      * @param clinicId 门诊ID (可选)
      * @return 医生列表
      */
-    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"admin","patient"},mode = SaMode.OR)
     @GetMapping("/doctors")
     public Result<List<DoctorVO>> getDoctorList(
             @RequestParam(required = false) Long deptId,
@@ -245,7 +245,7 @@ public class RegistrationController {
      * @param doctorId 医生ID
      * @return 医生详情
      */
-    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"admin","patient"},mode = SaMode.OR)
     @GetMapping("/doctors/{doctorId}")
     public Result<DoctorVO> getDoctorDetail(@PathVariable Long doctorId) {
         log.info("接收到获取医生详情请求, doctorId: {}", doctorId);
@@ -273,7 +273,7 @@ public class RegistrationController {
      *              - endDate（结束日期，可选，默认为开始日期后7天）
      * @return 排班列表，包含医生基本信息和可预约状态
      */
-    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"admin","patient"},mode = SaMode.OR)
     @PostMapping("/schedules")
     public Result<List<ScheduleListVO>> getScheduleList(ScheduleQuery query) {
         log.info("接收到获取排班列表请求, 查询条件: {}", query);
@@ -292,7 +292,7 @@ public class RegistrationController {
      * @param scheduleId 排班ID
      * @return 排班详情，包含医生、科室、门诊和预约相关的完整信息
      */
-    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"admin","patient"},mode = SaMode.OR)
     @GetMapping("/schedules/{scheduleId}")
     public Result<ScheduleDetailVO> getScheduleDetail(@PathVariable Long scheduleId) {
         log.info("接收到获取排班详情请求, scheduleId: {}", scheduleId);
@@ -330,7 +330,7 @@ public class RegistrationController {
      *              - endDate（结束日期，可选，默认为开始日期后7天）
      * @return 排班列表，包含医生基本信息和可预约状态
      */
-    @SaCheckRole(value = {"admin,patient"},mode = SaMode.OR)
+    @SaCheckRole(value = {"admin","patient"},mode = SaMode.OR)
     @PostMapping("/doctor-schedules")
     public Result<List<ScheduleListVO>> getDoctorSchedules(ScheduleQuery query) {
         if (query == null || query.getDoctorId() == null) {
