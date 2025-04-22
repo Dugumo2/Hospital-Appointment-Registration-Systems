@@ -15,6 +15,12 @@ import com.graduation.his.service.entity.*;
 import com.graduation.his.utils.redis.IRedisService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -28,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.Properties;
 
 /**
  * @author hua
@@ -58,6 +65,9 @@ public class MedicalServiceImpl implements IMedicalService {
     
     @Autowired
     private RabbitTemplate rabbitTemplate;
+    
+    @Autowired
+    private RabbitAdmin rabbitAdmin;
     
     @Autowired
     private IRedisService redisService;
@@ -163,18 +173,23 @@ public class MedicalServiceImpl implements IMedicalService {
         feedbackMessageService.save(message);
         
         // 获取接收者信息
-        Long receiverId;
+        Long receiverEntityId; // 接收者实体ID（医生ID或患者ID）
+        Long receiverUserId; // 接收者用户ID
         String receiverName;
         if (senderType == 0) {
             // 患者发送，接收者是医生
-            receiverId = diagnosis.getDoctorId();
+            receiverEntityId = diagnosis.getDoctorId();
             Doctor doctor = doctorService.getById(diagnosis.getDoctorId());
             receiverName = doctor != null ? doctor.getName() : "未知医生";
+            // 获取医生对应的用户ID
+            receiverUserId = doctor != null ? doctor.getUserId() : null;
         } else {
             // 医生发送，接收者是患者
-            receiverId = diagnosis.getPatientId();
+            receiverEntityId = diagnosis.getPatientId();
             Patient patient = patientService.getById(diagnosis.getPatientId());
             receiverName = patient != null ? patient.getName() : "未知患者";
+            // 获取患者对应的用户ID
+            receiverUserId = patient != null ? patient.getUserId() : null;
         }
         
         // 创建发送者姓名
@@ -193,22 +208,24 @@ public class MedicalServiceImpl implements IMedicalService {
         FeedbackMessageDTO messageDTO = new FeedbackMessageDTO();
         BeanUtils.copyProperties(message, messageDTO);
         messageDTO.setSenderName(senderName);
-        messageDTO.setReceiverId(receiverId);
+        messageDTO.setReceiverId(receiverEntityId);
         messageDTO.setReceiverName(receiverName);
         
         // 检查接收者是否在线并发送消息
-        boolean isOnline = isUserOnline(receiverId);
+        boolean isOnline = isUserOnline(receiverUserId);
         if (isOnline) {
-            // 通过WebSocket发送消息
-            String destination = "/queue/feedback/" + receiverId;
-            sendToWebSocket(destination, messageDTO);
+            // 通过WebSocket点对点发送消息，使用用户ID
+            sendToUserWebSocket(receiverUserId, messageDTO);
         } else {
-            // 通过RabbitMQ异步发送消息
-            String routingKey = "user." + receiverId;
+            // 确保用户专属队列存在
+            ensureUserQueueExists(receiverEntityId);
+            
+            // 通过RabbitMQ异步发送消息，使用实体ID作为路由键
+            String routingKey = Constants.MessageKey.USER_ROUTING_KEY_PREFIX + receiverEntityId;
             sendToRabbitMQAsync(Constants.MessageKey.FEEDBACK_MESSAGE_QUEUE, routingKey, messageDTO);
             
-            // 异步更新未读消息数量
-            updateUnreadMessageCountAsync(receiverId, 1);
+            // 异步更新未读消息数量 - 使用实体ID，保持与数据库记录一致
+            updateUnreadMessageCountAsync(receiverEntityId, 1);
         }
         
         return messageDTO;
@@ -369,17 +386,17 @@ public class MedicalServiceImpl implements IMedicalService {
     }
     
     /**
-     * 同步发送WebSocket消息
-     * @param destination 目标
+     * 同步发送点对点WebSocket消息
+     * @param userId 用户ID
      * @param message 消息
      */
-    private void sendToWebSocket(String destination, Object message) {
+    private void sendToUserWebSocket(Long userId, Object message) {
         try {
-            log.info("发送消息到WebSocket, destination: {}", destination);
-            messagingTemplate.convertAndSend(destination, message);
-            log.info("WebSocket消息发送成功");
+            log.info("发送点对点消息到WebSocket用户, userId: {}", userId);
+            messagingTemplate.convertAndSendToUser(userId.toString(), Constants.WebSocketConstants.FEEDBACK_QUEUE, message);
+            log.info("点对点WebSocket消息发送成功");
         } catch (Exception e) {
-            log.error("WebSocket消息发送异常", e);
+            log.error("点对点WebSocket消息发送异常", e);
         }
     }
     
@@ -552,6 +569,42 @@ public class MedicalServiceImpl implements IMedicalService {
         } catch (Exception e) {
             log.error("判断是否为当前医生异常", e);
             return false;
+        }
+    }
+    
+    /**
+     * 确保用户专属队列存在
+     * @param entityId 实体ID（患者ID或医生ID）
+     */
+    private void ensureUserQueueExists(Long entityId) {
+        try {
+            String queueName = "user.queue." + entityId;
+            
+            // 检查队列是否存在
+            Properties queueProps = rabbitAdmin.getQueueProperties(queueName);
+            if (queueProps == null) {
+                log.info("用户队列不存在，创建队列: {}", queueName);
+                
+                // 创建队列
+                Queue queue = QueueBuilder.durable(queueName)
+                        .withArgument("x-dead-letter-exchange", "dead.letter.exchange")
+                        .withArgument("x-dead-letter-routing-key", "dead.letter.routing.key")
+                        .withArgument("x-message-ttl", 30 * 24 * 60 * 60 * 1000) // 30天过期
+                        .withArgument("x-queue-mode", "lazy") // 将队列设置为lazy模式
+                        .build();
+                rabbitAdmin.declareQueue(queue);
+                
+                // 创建绑定关系
+                String routingKey = Constants.MessageKey.USER_ROUTING_KEY_PREFIX + entityId;
+                Binding binding = BindingBuilder.bind(queue)
+                        .to(new TopicExchange(Constants.MessageKey.FEEDBACK_MESSAGE_QUEUE))
+                        .with(routingKey);
+                rabbitAdmin.declareBinding(binding);
+                
+                log.info("为实体ID: {}创建了专用队列: {}", entityId, queueName);
+            }
+        } catch (Exception e) {
+            log.error("创建用户队列异常", e);
         }
     }
 }

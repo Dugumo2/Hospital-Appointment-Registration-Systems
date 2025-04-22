@@ -1,6 +1,7 @@
 package com.graduation.his.service.entity;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.graduation.his.domain.dto.FeedbackMessageDTO;
 import com.graduation.his.domain.po.FeedbackMessage;
 
 import java.util.List;
@@ -59,4 +60,12 @@ public interface IFeedbackMessageService extends IService<FeedbackMessage> {
      * @return 是否成功
      */
     boolean markAllAsRead(Long diagId, Long userId, Integer role);
+
+    /**
+     * 获取接收者的未读消息列表
+     * @param receiverId 接收者ID（患者ID或医生ID）
+     * @param receiverType 接收者类型（0:患者，1:医生）
+     * @return 未读消息列表
+     */
+    List<FeedbackMessageDTO> getPendingMessagesByReceiverId(Long receiverId, Integer receiverType);
 }

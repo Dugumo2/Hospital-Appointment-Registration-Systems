@@ -54,9 +54,19 @@ public class Constants {
 
     public static class MessageKey{
         /**
-         * 队列
+         * 反馈消息交换机
          */
         public static final String FEEDBACK_MESSAGE_QUEUE = "hros.topic";
+        
+        /**
+         * 反馈消息队列名
+         */
+        public static final String FEEDBACK_QUEUE_NAME = "feedback.message.queue";
+        
+        /**
+         * 用户消息路由键前缀
+         */
+        public static final String USER_ROUTING_KEY_PREFIX = "user.";
     }
     
     /**
@@ -77,5 +87,15 @@ public class Constants {
          * 分布式锁租约时间（秒）
          */
         public static final long LOCK_LEASE_TIME = 10;
+    }
+    
+    /**
+     * WebSocket相关常量
+     */
+    public static class WebSocketConstants {
+        /**
+         * 诊后反馈消息队列路径
+         */
+        public static final String FEEDBACK_QUEUE = "/queue/feedback";
     }
 }

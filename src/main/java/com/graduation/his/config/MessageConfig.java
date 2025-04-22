@@ -4,6 +4,7 @@ import com.graduation.his.common.Constants;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.retry.MessageRecoverer;
 import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -102,7 +103,7 @@ public class MessageConfig {
      */
     @Bean
     public Queue feedbackQueue() {
-        return QueueBuilder.durable("feedback.message.queue")
+        return QueueBuilder.durable(Constants.MessageKey.FEEDBACK_QUEUE_NAME)
                 .withArgument("x-dead-letter-exchange", "dead.letter.exchange")
                 .withArgument("x-dead-letter-routing-key", "dead.letter.routing.key")
                 .withArgument("x-message-ttl", 7 * 24 * 60 * 60 * 1000) // 消息7天过期
@@ -118,5 +119,13 @@ public class MessageConfig {
         return BindingBuilder.bind(feedbackQueue)
                 .to(feedbackExchange)
                 .with("user.*"); // 使用通配符匹配所有用户
+    }
+    
+    /**
+     * 配置RabbitAdmin用于管理队列和交换机
+     */
+    @Bean
+    public RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
+        return new RabbitAdmin(connectionFactory);
     }
 }
