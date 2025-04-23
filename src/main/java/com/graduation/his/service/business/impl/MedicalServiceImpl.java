@@ -27,6 +27,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.Duration;
+import org.redisson.api.RMap;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -35,6 +37,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.Properties;
+import java.util.HashMap;
+import java.time.ZoneOffset;
 
 /**
  * @author hua
@@ -214,8 +218,17 @@ public class MedicalServiceImpl implements IMedicalService {
         // 检查接收者是否在线并发送消息
         boolean isOnline = isUserOnline(receiverUserId);
         if (isOnline) {
-            // 通过WebSocket点对点发送消息，使用用户ID
-            sendToUserWebSocket(receiverUserId, messageDTO);
+            // 即使用户在线通过WebSocket直接收到消息，也应该更新Redis中的未读消息计数
+            // 因为用户可能没有查看该消息
+            updateUnreadMessageCountAsync(receiverEntityId, diagId, 1);
+            
+            // 通过WebSocket点对点发送消息
+            // 1. 发送消息内容
+            sendMessageToWebSocket(receiverUserId, messageDTO);
+            
+            // 2. 发送未读计数更新
+            int receiverRole = (senderType == 0) ? 1 : 0; // 如果发送者是患者(0)，接收者是医生(1)，反之亦然
+            sendUnreadCountersToWebSocket(receiverUserId, receiverEntityId, receiverRole);
         } else {
             // 确保用户专属队列存在
             ensureUserQueueExists(receiverEntityId);
@@ -225,7 +238,7 @@ public class MedicalServiceImpl implements IMedicalService {
             sendToRabbitMQAsync(Constants.MessageKey.FEEDBACK_MESSAGE_QUEUE, routingKey, messageDTO);
             
             // 异步更新未读消息数量 - 使用实体ID，保持与数据库记录一致
-            updateUnreadMessageCountAsync(receiverEntityId, 1);
+            updateUnreadMessageCountAsync(receiverEntityId, diagId, 1);
         }
         
         return messageDTO;
@@ -279,162 +292,238 @@ public class MedicalServiceImpl implements IMedicalService {
         }).collect(Collectors.toList());
     }
 
-    @Override
-    public boolean markMessageAsRead(Long messageId) {
-        log.info("标记消息为已读, messageId: {}", messageId);
-        
-        if (messageId == null) {
-            throw new BusinessException("消息ID不能为空");
-        }
-        
-        return feedbackMessageService.markAsRead(messageId);
-    }
 
     @Override
-    public boolean markAllMessagesAsRead(Long diagId, Long userId, Integer role) {
-        log.info("标记诊断相关的所有消息为已读, diagId: {}, userId: {}, role: {}", diagId, userId, role);
+    public boolean markAllMessagesAsRead(Long diagId, Long entityId, Integer role) {
+        log.info("标记诊断相关的所有消息为已读, diagId: {}, entityId: {}, role: {}", diagId, entityId, role);
         
         if (diagId == null) {
             throw new BusinessException("诊断ID不能为空");
         }
-        if (userId == null) {
-            throw new BusinessException("用户ID不能为空");
+        if (entityId == null) {
+            throw new BusinessException("实体ID不能为空");
         }
         if (role == null) {
             throw new BusinessException("角色不能为空");
         }
         
-        return feedbackMessageService.markAllAsRead(diagId, userId, role);
+        // 1. 标记数据库中的消息为已读
+        boolean result = feedbackMessageService.markAllAsRead(diagId, entityId, role);
+        
+        // 2. 清空Redis中的未读消息计数
+        try {
+            String redisKey = Constants.RedisKey.MESSAGE_USER + entityId;
+            // 获取之前的未读消息数量
+            int unreadCount = getUnreadMessageCount(entityId, diagId);
+            
+            if (unreadCount > 0) {
+                // 删除Hash中的字段
+                redisService.getMap(redisKey).remove(diagId.toString());
+                
+                // 获取用户对象
+                Long userId = getEntityUserId(entityId, role);
+                if (userId != null) {
+                    // 发送未读计数更新
+                    sendUnreadCountersToWebSocket(userId, entityId, role);
+                }
+            }
+        } catch (Exception e) {
+            log.error("清空Redis中的未读消息计数异常", e);
+        }
+        
+        return result;
     }
 
     @Override
-    public int getUnreadMessageCount(Long userId, Integer role) {
-        log.info("获取用户的未读消息数量, userId: {}, role: {}", userId, role);
+    public int getUnreadMessageCount(Long entityId, Long diagId) {
+        log.info("获取用户的特定诊断未读消息数量, entityId: {}, diagId: {}", entityId, diagId);
         
-        if (userId == null) {
-            throw new BusinessException("用户ID不能为空");
-        }
-        if (role == null) {
-            throw new BusinessException("角色不能为空");
+        if (entityId == null || diagId == null) {
+            log.warn("获取未读消息数量参数错误: entityId={}, diagId={}", entityId, diagId);
+            return 0;
         }
         
-        return feedbackMessageService.getUnreadMessageCount(userId, role);
+        // 从Redis Hash中获取特定诊断的未读消息数量
+        String redisKey = Constants.RedisKey.MESSAGE_USER + entityId;
+        Object value = redisService.getFromMap(redisKey, diagId.toString());
+        
+        if (value == null) {
+            return 0;
+        }
+        
+        try {
+            if (value instanceof Integer) {
+                return (Integer) value;
+            } else if (value instanceof String) {
+                return Integer.parseInt((String) value);
+            } else {
+                log.warn("Redis中存储的未读消息数量类型异常: {}", value.getClass().getName());
+                return 0;
+            }
+        } catch (Exception e) {
+            log.error("解析Redis中的未读消息数量异常", e);
+            return 0;
+        }
+    }
+    
+    @Override
+    public Map<String, Integer> getAllUnreadMessageCounts(Long entityId, Integer role) {
+        log.info("获取用户的所有诊断未读消息数量, entityId: {}, role: {}", entityId, role);
+        
+        if (entityId == null) {
+            log.warn("获取所有未读消息数量参数错误: entityId={}, role={}", entityId, role);
+            return new HashMap<>();
+        }
+        
+        try {
+            // 从Redis Hash中获取所有诊断的未读消息数量
+            String redisKey = Constants.RedisKey.MESSAGE_USER + entityId;
+            RMap<String, Integer> redisMap = redisService.getMap(redisKey);
+            
+            if (redisMap == null || redisMap.isEmpty()) {
+                // 如果Redis中没有数据，则从数据库中查询
+                Map<String, Integer> countsFromDb = feedbackMessageService.getUnreadMessageCountsByEntityId(entityId, role);
+                if (!countsFromDb.isEmpty()) {
+                    // 将数据库查询结果存入Redis
+                    for (Map.Entry<String, Integer> entry : countsFromDb.entrySet()) {
+                        redisMap.put(entry.getKey(), entry.getValue());
+                    }
+                    redisMap.expire(Duration.ofDays(30)); // 设置30天过期时间
+                }
+                return countsFromDb;
+            }
+            
+            // 使用HashMap复制RedissonMap的内容，避免直接返回可能导致的并发问题
+            Map<String, Integer> result = new HashMap<>(redisMap);
+            return result;
+        } catch (Exception e) {
+            log.error("获取所有未读消息数量异常", e);
+            return new HashMap<>();
+        }
+    }
+    
+    /**
+     * 根据实体ID和角色获取用户ID
+     * @param entityId 实体ID
+     * @param role 用户角色
+     * @return 用户ID
+     */
+    private Long getEntityUserId(Long entityId, Integer role) {
+        try {
+            if (role == 0) {
+                // 患者
+                Patient patient = patientService.getById(entityId);
+                return patient != null ? patient.getUserId() : null;
+            } else if (role == 1) {
+                // 医生
+                Doctor doctor = doctorService.getById(entityId);
+                return doctor != null ? doctor.getUserId() : null;
+            }
+            return null;
+        } catch (Exception e) {
+            log.error("获取实体对应的用户ID异常", e);
+            return null;
+        }
+    }
+    
+    /**
+     * 发送消息到WebSocket
+     * @param userId 用户ID
+     * @param message 消息内容
+     */
+    private void sendMessageToWebSocket(Long userId, FeedbackMessageDTO message) {
+        try {
+            // 构造消息对象
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", Constants.WebSocketConstants.TYPE_MESSAGE);
+            
+            Map<String, Object> messageData = new HashMap<>();
+            messageData.put("id", message.getMessageId());
+            messageData.put("chatId", message.getDiagId());
+            messageData.put("content", message.getContent());
+            messageData.put("sender", message.getSenderId());
+            messageData.put("senderName", message.getSenderName());
+            messageData.put("senderType", message.getSenderType());
+            messageData.put("timestamp", message.getCreateTime() != null ? 
+                    message.getCreateTime().toInstant(ZoneOffset.UTC).toEpochMilli() : System.currentTimeMillis());
+            
+            payload.put("message", messageData);
+            
+            // 发送WebSocket消息
+            messagingTemplate.convertAndSendToUser(
+                userId.toString(), 
+                Constants.WebSocketConstants.FEEDBACK_QUEUE, 
+                payload
+            );
+            log.info("发送消息到WebSocket成功: userId={}, messageId={}", userId, message.getMessageId());
+        } catch (Exception e) {
+            log.error("发送消息到WebSocket异常", e);
+        }
+    }
+    
+    /**
+     * 发送未读计数更新到WebSocket
+     * @param userId 用户ID
+     * @param entityId 实体ID（患者ID或医生ID）
+     * @param role 用户角色
+     */
+    private void sendUnreadCountersToWebSocket(Long userId, Long entityId, Integer role) {
+        try {
+            // 获取所有未读计数
+            Map<String, Integer> unreadCounts = getAllUnreadMessageCounts(entityId, role);
+            
+            // 构造消息对象
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", Constants.WebSocketConstants.TYPE_UNREAD_COUNTER);
+            payload.put("counters", unreadCounts);
+            
+            // 发送WebSocket消息
+            messagingTemplate.convertAndSendToUser(
+                userId.toString(), 
+                Constants.WebSocketConstants.FEEDBACK_QUEUE, 
+                payload
+            );
+            log.info("发送未读计数更新到WebSocket成功: userId={}", userId);
+        } catch (Exception e) {
+            log.error("发送未读计数更新到WebSocket异常", e);
+        }
     }
 
-    @Override
-    public boolean canFeedback(Long diagId) {
-        log.info("检查诊断是否可以进行反馈, diagId: {}", diagId);
-        
-        if (diagId == null) {
-            throw new BusinessException("诊断ID不能为空");
-        }
-        
-        return diagnosisService.isWithinFeedbackPeriod(diagId);
-    }
-    
-    @Override
-    public Long getPatientIdByUserId(Long userId) {
-        log.info("根据用户ID获取患者ID, userId: {}", userId);
-        
-        if (userId == null) {
-            throw new BusinessException("用户ID不能为空");
-        }
-        
-        Patient patient = patientService.getByUserId(userId);
-        if (patient == null) {
-            throw new BusinessException("未找到患者信息");
-        }
-        
-        return patient.getPatientId();
-    }
-    
-    @Override
-    public Long getDoctorIdByUserId(Long userId) {
-        log.info("根据用户ID获取医生ID, userId: {}", userId);
-        
-        if (userId == null) {
-            throw new BusinessException("用户ID不能为空");
-        }
-        
-        Doctor doctor = doctorService.getDoctorByUserId(userId);
-        if (doctor == null) {
-            throw new BusinessException("未找到医生信息");
-        }
-        
-        return doctor.getDoctorId();
-    }
-    
-    /**
-     * 检查用户是否在线
-     * @param userId 用户ID
-     * @return 是否在线
-     */
-    private boolean isUserOnline(Long userId) {
-        // 先从缓存中获取
-        Boolean cached = USER_ONLINE_STATUS.get(userId);
-        if (cached != null) {
-            return cached;
-        }
-        
-        // 缓存中不存在，通过Sa-Token检查
-        boolean isOnline = StpUtil.isLogin(userId);
-        
-        // 更新缓存
-        USER_ONLINE_STATUS.put(userId, isOnline);
-        
-        return isOnline;
-    }
-    
-    /**
-     * 同步发送点对点WebSocket消息
-     * @param userId 用户ID
-     * @param message 消息
-     */
-    private void sendToUserWebSocket(Long userId, Object message) {
-        try {
-            log.info("发送点对点消息到WebSocket用户, userId: {}", userId);
-            messagingTemplate.convertAndSendToUser(userId.toString(), Constants.WebSocketConstants.FEEDBACK_QUEUE, message);
-            log.info("点对点WebSocket消息发送成功");
-        } catch (Exception e) {
-            log.error("点对点WebSocket消息发送异常", e);
-        }
-    }
-    
-    /**
-     * 异步发送消息到RabbitMQ
-     * @param exchange 交换机
-     * @param routingKey 路由键
-     * @param message 消息
-     */
-    @Override
-    @Async("threadPoolTaskExecutor")
-    public void sendToRabbitMQAsync(String exchange, String routingKey, Object message) {
-        try {
-            log.info("异步发送消息到RabbitMQ, exchange: {}, routingKey: {}", exchange, routingKey);
-            rabbitTemplate.convertAndSend(exchange, routingKey, message);
-            log.info("RabbitMQ消息发送成功");
-        } catch (Exception e) {
-            log.error("RabbitMQ消息发送异常", e);
-        }
-    }
-    
     /**
      * 异步更新用户未读消息数量
-     * @param userId 用户ID
+     * @param entityId 实体ID
+     * @param diagId 诊断ID
      * @param count 增加的数量
      */
     @Override
     @Async("threadPoolTaskExecutor")
-    public void updateUnreadMessageCountAsync(Long userId, int count) {
+    public void updateUnreadMessageCountAsync(Long entityId, Long diagId, int count) {
         try {
-            log.info("异步更新用户未读消息数量, userId: {}, count: {}", userId, count);
-            String redisKey = Constants.RedisKey.MESSAGE_USER + userId;
-            if (redisService.isExists(redisKey)) {
-                redisService.incrBy(redisKey, count);
-            } else {
-                redisService.setValue(redisKey, count, 30 * 24 * 60 * 60); // 30天过期
+            log.info("异步更新用户未读消息数量, entityId: {}, diagId: {}, count: {}", entityId, diagId, count);
+            
+            String redisKey = Constants.RedisKey.MESSAGE_USER + entityId;
+            RMap<String, Integer> redisMap = redisService.getMap(redisKey);
+            
+            // 获取当前未读数
+            Integer currentCount = redisMap.get(diagId.toString());
+            if (currentCount == null) {
+                currentCount = 0;
             }
-            log.info("更新未读消息数量成功");
+            
+            // 更新未读数
+            int newCount = currentCount + count;
+            if (newCount <= 0) {
+                // 移除键值对
+                redisMap.remove(diagId.toString());
+            } else {
+                // 设置新的未读数
+                redisMap.put(diagId.toString(), newCount);
+            }
+            
+            // 设置过期时间
+            redisMap.expire(Duration.ofDays(30)); // 30天过期
+            
+            log.info("更新未读消息数量成功: diagId={}, newCount={}", diagId, newCount);
         } catch (Exception e) {
             log.error("更新未读消息数量异常", e);
         }
@@ -606,5 +695,87 @@ public class MedicalServiceImpl implements IMedicalService {
         } catch (Exception e) {
             log.error("创建用户队列异常", e);
         }
+    }
+
+    @Override
+    public boolean canFeedback(Long diagId) {
+        log.info("检查诊断是否可以进行反馈, diagId: {}", diagId);
+        
+        if (diagId == null) {
+            throw new BusinessException("诊断ID不能为空");
+        }
+        
+        return diagnosisService.isWithinFeedbackPeriod(diagId);
+    }
+
+    @Override
+    public Long getPatientIdByUserId(Long userId) {
+        log.info("根据用户ID获取患者ID, userId: {}", userId);
+        
+        if (userId == null) {
+            throw new BusinessException("用户ID不能为空");
+        }
+        
+        Patient patient = patientService.getByUserId(userId);
+        if (patient == null) {
+            throw new BusinessException("未找到患者信息");
+        }
+        
+        return patient.getPatientId();
+    }
+
+    @Override
+    public Long getDoctorIdByUserId(Long userId) {
+        log.info("根据用户ID获取医生ID, userId: {}", userId);
+        
+        if (userId == null) {
+            throw new BusinessException("用户ID不能为空");
+        }
+        
+        Doctor doctor = doctorService.getDoctorByUserId(userId);
+        if (doctor == null) {
+            throw new BusinessException("未找到医生信息");
+        }
+        
+        return doctor.getDoctorId();
+    }
+
+    /**
+     * 异步发送消息到RabbitMQ
+     * @param exchange 交换机
+     * @param routingKey 路由键
+     * @param message 消息
+     */
+    @Override
+    @Async("threadPoolTaskExecutor")
+    public void sendToRabbitMQAsync(String exchange, String routingKey, Object message) {
+        try {
+            log.info("异步发送消息到RabbitMQ, exchange: {}, routingKey: {}", exchange, routingKey);
+            rabbitTemplate.convertAndSend(exchange, routingKey, message);
+            log.info("RabbitMQ消息发送成功");
+        } catch (Exception e) {
+            log.error("RabbitMQ消息发送异常", e);
+        }
+    }
+
+    /**
+     * 检查用户是否在线
+     * @param userId 用户ID
+     * @return 是否在线
+     */
+    private boolean isUserOnline(Long userId) {
+        // 先从缓存中获取
+        Boolean cached = USER_ONLINE_STATUS.get(userId);
+        if (cached != null) {
+            return cached;
+        }
+        
+        // 缓存中不存在，通过Sa-Token检查
+        boolean isOnline = StpUtil.isLogin(userId);
+        
+        // 更新缓存
+        USER_ONLINE_STATUS.put(userId, isOnline);
+        
+        return isOnline;
     }
 }

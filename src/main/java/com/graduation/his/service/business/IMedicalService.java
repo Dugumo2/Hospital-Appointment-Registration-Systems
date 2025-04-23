@@ -1,12 +1,11 @@
 package com.graduation.his.service.business;
 
 import com.graduation.his.domain.dto.FeedbackMessageDTO;
-import com.graduation.his.domain.po.Diagnosis;
-import com.graduation.his.domain.po.FeedbackMessage;
 import com.graduation.his.domain.po.User;
 import com.graduation.his.domain.vo.DiagnosisVO;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author hua
@@ -52,30 +51,32 @@ public interface IMedicalService {
      * @return 消息DTO列表
      */
     List<FeedbackMessageDTO> getFeedbackMessages(Long diagId);
-    
-    /**
-     * 标记消息为已读
-     * @param messageId 消息ID
-     * @return 是否成功
-     */
-    boolean markMessageAsRead(Long messageId);
+
     
     /**
      * 标记诊断相关的所有消息为已读
      * @param diagId 诊断ID
-     * @param userId 用户ID
+     * @param entityId 实体ID（患者ID或医生ID）
      * @param role 用户角色(0-患者,1-医生)
      * @return 是否成功
      */
-    boolean markAllMessagesAsRead(Long diagId, Long userId, Integer role);
+    boolean markAllMessagesAsRead(Long diagId, Long entityId, Integer role);
     
     /**
-     * 获取用户的未读消息数量
-     * @param userId 用户ID
-     * @param role 用户角色(0-患者,1-医生)
+     * 获取用户的特定诊断的未读消息数量
+     * @param entityId 实体ID（患者ID或医生ID）
+     * @param diagId 诊断ID
      * @return 未读消息数量
      */
-    int getUnreadMessageCount(Long userId, Integer role);
+    int getUnreadMessageCount(Long entityId, Long diagId);
+    
+    /**
+     * 获取用户的所有诊断未读消息数量映射
+     * @param entityId 实体ID（患者ID或医生ID）
+     * @param role 用户角色(0-患者,1-医生)
+     * @return 诊断ID -> 未读消息数量 的映射
+     */
+    Map<String, Integer> getAllUnreadMessageCounts(Long entityId, Integer role);
     
     /**
      * 检查诊断是否可以进行反馈(15天内)
@@ -128,8 +129,9 @@ public interface IMedicalService {
     
     /**
      * 异步更新用户未读消息数量
-     * @param userId 用户ID
+     * @param entityId 实体ID（患者ID或医生ID）
+     * @param diagId 诊断ID
      * @param count 增加的数量
      */
-    void updateUnreadMessageCountAsync(Long userId, int count);
+    void updateUnreadMessageCountAsync(Long entityId, Long diagId, int count);
 }

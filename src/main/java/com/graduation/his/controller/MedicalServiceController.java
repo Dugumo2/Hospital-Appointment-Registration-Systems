@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author hua
@@ -208,35 +209,13 @@ public class MedicalServiceController {
     }
     
     /**
-     * 标记消息为已读
+     * 获取未读消息数量映射
      * 
-     * @param messageId 消息ID
-     * @return 是否成功
+     * @return 诊断ID -> 未读消息数量 的映射
      */
     @SaCheckRole(value = {"doctor", "patient"},mode = SaMode.OR)
-    @PostMapping("/feedback/{messageId}/read")
-    public Result<Boolean> markMessageAsRead(@PathVariable Long messageId) {
-        log.info("标记消息为已读, messageId: {}", messageId);
-        try {
-            boolean result = medicalService.markMessageAsRead(messageId);
-            return Result.success(result ? "标记成功" : "标记失败", result);
-        } catch (BusinessException e) {
-            log.error("标记消息为已读业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("标记消息为已读异常", e);
-            return Result.error("服务器异常，请稍后重试");
-        }
-    }
-    
-    /**
-     * 获取未读消息数量
-     * 
-     * @return 未读消息数量
-     */
-    @SaCheckRole(value = {"doctor", "patient"},mode = SaMode.OR)
-    @GetMapping("/feedback/unread/count")
-    public Result<Integer> getUnreadMessageCount() {
+    @GetMapping("/feedback/unread/counts")
+    public Result<Map<String, Integer>> getUnreadMessageCounts() {
         try {
             // 获取当前登录用户
             User user = medicalService.getCurrentUser();
@@ -253,13 +232,57 @@ public class MedicalServiceController {
                 return Result.error("未知错误，请联系管理员");
             }
             
-            int count = medicalService.getUnreadMessageCount(entityId, user.getRole());
-            return Result.success("获取未读消息数量成功", count);
+            // 获取所有诊断的未读消息数量映射
+            Map<String, Integer> counts = medicalService.getAllUnreadMessageCounts(entityId, user.getRole());
+            return Result.success("获取未读消息数量成功", counts);
         } catch (BusinessException e) {
             log.error("获取未读消息数量业务异常: {}", e.getMessage());
             return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("获取未读消息数量异常", e);
+            return Result.error("服务器异常，请稍后重试");
+        }
+    }
+    
+    /**
+     * 标记诊断相关的所有消息为已读
+     * 
+     * @param diagId 诊断ID
+     * @return 是否成功
+     */
+    @SaCheckRole(value = {"doctor", "patient"},mode = SaMode.OR)
+    @PostMapping("/diagnoses/{diagId}/feedback/read")
+    public Result<Boolean> markMessagesAsRead(@PathVariable Long diagId) {
+        log.info("标记诊断相关的所有消息为已读, diagId: {}", diagId);
+        try {
+            // 获取当前登录用户
+            User user = medicalService.getCurrentUser();
+            
+            // 获取诊断详情
+            DiagnosisVO diagnosis = medicalService.getDiagnosisDetail(diagId);
+            
+            // 验证是否为管理员、当前患者或当前医生
+            if (user.getRole() != 2 && !medicalService.isCurrentPatient(diagnosis.getPatientId()) && !medicalService.isCurrentDoctor(diagnosis.getDoctorId())) {
+                return Result.error("无权访问该诊断记录的消息");
+            }
+            
+            // 根据用户角色获取不同类型的ID
+            Long entityId = null;
+            if (user.getRole() == 0) {
+                // 患者
+                entityId = diagnosis.getPatientId();
+            } else if (user.getRole() == 1) {
+                // 医生
+                entityId = diagnosis.getDoctorId();
+            }
+            
+            boolean result = medicalService.markAllMessagesAsRead(diagId, entityId, user.getRole());
+            return Result.success(result ? "标记成功" : "标记失败", result);
+        } catch (BusinessException e) {
+            log.error("标记消息为已读业务异常: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("标记消息为已读异常", e);
             return Result.error("服务器异常，请稍后重试");
         }
     }

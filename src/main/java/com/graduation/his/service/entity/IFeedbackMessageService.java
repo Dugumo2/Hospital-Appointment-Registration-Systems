@@ -5,6 +5,7 @@ import com.graduation.his.domain.dto.FeedbackMessageDTO;
 import com.graduation.his.domain.po.FeedbackMessage;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * <p>
@@ -46,20 +47,20 @@ public interface IFeedbackMessageService extends IService<FeedbackMessage> {
     
     /**
      * 获取用户的未读消息数量
-     * @param userId 用户ID
+     * @param entityId 实体ID（患者ID或医生ID）
      * @param role 用户角色(0-患者,1-医生)
      * @return 未读消息数量
      */
-    int getUnreadMessageCount(Long userId, Integer role);
+    int getUnreadMessageCount(Long entityId, Integer role);
     
     /**
      * 将诊断相关的所有消息标记为已读
      * @param diagId 诊断ID
-     * @param userId 用户ID
+     * @param entityId 实体ID（患者ID或医生ID）
      * @param role 用户角色(0-患者,1-医生)
      * @return 是否成功
      */
-    boolean markAllAsRead(Long diagId, Long userId, Integer role);
+    boolean markAllAsRead(Long diagId, Long entityId, Integer role);
 
     /**
      * 获取接收者的未读消息列表
@@ -68,4 +69,21 @@ public interface IFeedbackMessageService extends IService<FeedbackMessage> {
      * @return 未读消息列表
      */
     List<FeedbackMessageDTO> getPendingMessagesByReceiverId(Long receiverId, Integer receiverType);
+
+    /**
+     * 获取特定诊断的未读消息数量
+     * @param diagId 诊断ID
+     * @param entityId 实体ID（患者ID或医生ID）
+     * @param role 用户角色(0-患者,1-医生)
+     * @return 未读消息数量
+     */
+    int getUnreadMessageCountByDiag(Long diagId, Long entityId, Integer role);
+
+    /**
+     * 获取指定实体的所有未读消息数量映射
+     * @param entityId 实体ID（患者ID或医生ID）
+     * @param role 用户角色(0-患者,1-医生)
+     * @return 诊断ID -> 未读消息数量 的映射
+     */
+    Map<String, Integer> getUnreadMessageCountsByEntityId(Long entityId, Integer role);
 }

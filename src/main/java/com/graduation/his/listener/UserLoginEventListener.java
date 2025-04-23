@@ -78,13 +78,16 @@ public class UserLoginEventListener implements SaTokenListener {
             
             // 2. 获取实体ID
             Long entityId = null;
+            Integer role = null;
             if (patient != null) {
                 // 用户是患者
                 entityId = patient.getPatientId();
+                role = 0; // 患者角色
                 log.info("用户是患者，患者ID: {}", entityId);
             } else if (doctor != null) {
                 // 用户是医生
                 entityId = doctor.getDoctorId();
+                role = 1; // 医生角色
                 log.info("用户是医生，医生ID: {}", entityId);
             } else {
                 log.warn("用户既不是医生也不是患者，无法获取积压消息: {}", userId);
@@ -136,26 +139,44 @@ public class UserLoginEventListener implements SaTokenListener {
             
             // 为了在Lambda中使用，需要使变量为final
             final Long finalEntityId = entityId;
+            final Integer finalRole = role;
             final int finalReceivedCount = receivedCount;
             final List<FeedbackMessageDTO> finalMessages = new ArrayList<>(messages);
             
             // 创建批处理线程，避免阻塞登录流程
             CompletableFuture.runAsync(() -> {
                 try {
-                    // 批量发送逻辑
+                    // 批量发送消息
                     for (FeedbackMessageDTO msg : finalMessages) {
+                        // 只发送消息内容，不再发送未读计数
+                        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                        payload.put("type", Constants.WebSocketConstants.TYPE_MESSAGE);
+                        
+                        java.util.Map<String, Object> messageData = new java.util.HashMap<>();
+                        messageData.put("id", msg.getMessageId());
+                        messageData.put("chatId", msg.getDiagId());
+                        messageData.put("content", msg.getContent());
+                        messageData.put("sender", msg.getSenderId());
+                        messageData.put("senderName", msg.getSenderName());
+                        messageData.put("senderType", msg.getSenderType());
+                        messageData.put("timestamp", msg.getCreateTime() != null ? 
+                                msg.getCreateTime().toInstant(java.time.ZoneOffset.UTC).toEpochMilli() : System.currentTimeMillis());
+                        
+                        payload.put("message", messageData);
+                        
                         messagingTemplate.convertAndSendToUser(
                             userId.toString(), 
                             Constants.WebSocketConstants.FEEDBACK_QUEUE, 
-                            msg
+                            payload
                         );
                     }
+                    
                     log.info("成功推送{}条消息给用户{}", finalMessages.size(), userId);
                     
                     // 如果还有更多消息，递归处理下一批
                     if (finalReceivedCount == batchSize && messageCount > batchSize) {
                         log.info("队列中还有更多消息，继续处理下一批");
-                        pushNextBatch(userId, finalEntityId, userQueueName);
+                        pushNextBatch(userId, finalEntityId, finalRole, userQueueName);
                     }
                 } catch (Exception e) {
                     log.error("批量推送消息异常", e);
@@ -170,9 +191,10 @@ public class UserLoginEventListener implements SaTokenListener {
      * 处理下一批消息
      * @param userId 用户ID
      * @param entityId 实体ID
+     * @param role 用户角色
      * @param userQueueName 用户队列名
      */
-    private void pushNextBatch(Long userId, Long entityId, String userQueueName) {
+    private void pushNextBatch(Long userId, Long entityId, Integer role, String userQueueName) {
         try {
             // 检查队列状态
             Properties queueProps = rabbitAdmin.getQueueProperties(userQueueName);
@@ -207,20 +229,37 @@ public class UserLoginEventListener implements SaTokenListener {
                 return; // 没有获取到有效消息
             }
             
-            // 批量推送消息到WebSocket
+            // 批量发送消息
             for (FeedbackMessageDTO msg : messages) {
+                // 只发送消息内容，不再发送未读计数
+                java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                payload.put("type", Constants.WebSocketConstants.TYPE_MESSAGE);
+                
+                java.util.Map<String, Object> messageData = new java.util.HashMap<>();
+                messageData.put("id", msg.getMessageId());
+                messageData.put("chatId", msg.getDiagId());
+                messageData.put("content", msg.getContent());
+                messageData.put("sender", msg.getSenderId());
+                messageData.put("senderName", msg.getSenderName());
+                messageData.put("senderType", msg.getSenderType());
+                messageData.put("timestamp", msg.getCreateTime() != null ? 
+                        msg.getCreateTime().toInstant(java.time.ZoneOffset.UTC).toEpochMilli() : System.currentTimeMillis());
+                
+                payload.put("message", messageData);
+                
                 messagingTemplate.convertAndSendToUser(
                     userId.toString(), 
                     Constants.WebSocketConstants.FEEDBACK_QUEUE, 
-                    msg
+                    payload
                 );
             }
+            
             log.info("成功推送下一批{}条消息给用户{}", messages.size(), userId);
             
             // 如果还有更多消息，递归处理下一批
             if (receivedCount == batchSize && messageCount > batchSize) {
                 log.info("队列中还有更多消息，继续处理下一批");
-                pushNextBatch(userId, entityId, userQueueName);
+                pushNextBatch(userId, entityId, role, userQueueName);
             }
         } catch (Exception e) {
             log.error("处理下一批消息异常", e);

@@ -49,7 +49,7 @@ public class Constants {
         /**
          * 用户未读消息前缀
          */
-        public static final String MESSAGE_USER = "message_user:";
+        public static final String MESSAGE_USER = "unread:";
     }
 
     public static class MessageKey{
@@ -97,5 +97,15 @@ public class Constants {
          * 诊后反馈消息队列路径
          */
         public static final String FEEDBACK_QUEUE = "/queue/feedback";
+        
+        /**
+         * WebSocket消息类型：普通消息
+         */
+        public static final String TYPE_MESSAGE = "message";
+        
+        /**
+         * WebSocket消息类型：未读计数更新
+         */
+        public static final String TYPE_UNREAD_COUNTER = "unread_counter";
     }
 }
