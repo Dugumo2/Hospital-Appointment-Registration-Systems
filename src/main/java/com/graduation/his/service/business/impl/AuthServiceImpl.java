@@ -5,13 +5,16 @@ import com.graduation.his.common.Constants;
 import com.graduation.his.exception.BusinessException;
 import com.graduation.his.domain.dto.UserLoginDTO;
 import com.graduation.his.domain.dto.UserRegisterDTO;
+import com.graduation.his.domain.dto.UserUpdateDTO;
 import com.graduation.his.domain.po.Patient;
 import com.graduation.his.domain.po.User;
+import com.graduation.his.domain.po.Doctor;
 import com.graduation.his.domain.vo.UserVO;
 import com.graduation.his.service.business.IAuthService;
 import com.graduation.his.service.entity.IPatientService;
 import com.graduation.his.service.entity.IUserService;
 import com.graduation.his.service.entity.MailService;
+import com.graduation.his.service.entity.IDoctorService;
 import com.graduation.his.utils.minio.MinioUtils;
 import com.graduation.his.utils.redis.RedissonService;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +41,7 @@ public class AuthServiceImpl implements IAuthService {
     private final RedissonService redissonService;
     private final IUserService userService;
     private final IPatientService patientService;
+    private final IDoctorService doctorService;
     private final MinioUtils minioUtils;
     
     @Override
@@ -357,6 +361,113 @@ public class AuthServiceImpl implements IAuthService {
             log.error("更新头像失败: {}", e.getMessage(), e);
             throw new BusinessException("更新头像失败: " + e.getMessage());
         }
+    }
+    
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserVO updateUserInfo(UserUpdateDTO updateDTO) {
+        if (updateDTO == null) {
+            throw new BusinessException("更新信息不能为空");
+        }
+        
+        // 校验是否登录
+        if (!StpUtil.isLogin()) {
+            throw new BusinessException("用户未登录");
+        }
+        
+        Long userId = StpUtil.getLoginIdAsLong();
+        
+        // 获取用户信息
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        
+        // 更新用户信息
+        if (StringUtils.isNotBlank(updateDTO.getPhone())) {
+            user.setPhone(updateDTO.getPhone());
+        }
+        
+        user.setUpdateTime(LocalDateTime.now());
+        userService.updateById(user);
+        
+        // 根据用户角色更新对应信息
+        if (user.getRole() == 0) {
+            // 患者角色
+            updatePatientInfo(userId, updateDTO);
+        } else if (user.getRole() == 1) {
+            // 医生角色
+            updateDoctorInfo(userId, updateDTO);
+        }
+        
+        log.info("用户[{}]信息更新成功", user.getUsername());
+        
+        // 返回更新后的用户信息
+        return getCurrentUserInfo();
+    }
+    
+    /**
+     * 更新患者信息
+     * @param userId 用户ID
+     * @param updateDTO 更新信息
+     */
+    private void updatePatientInfo(Long userId, UserUpdateDTO updateDTO) {
+        // 获取患者信息
+        Patient patient = patientService.getByUserId(userId);
+        if (patient == null) {
+            throw new BusinessException("患者信息不存在");
+        }
+        
+        // 更新患者信息
+        if (StringUtils.isNotBlank(updateDTO.getName())) {
+            patient.setName(updateDTO.getName());
+        }
+        
+        if (updateDTO.getGender() != null) {
+            patient.setGender(updateDTO.getGender());
+        }
+        
+        if (updateDTO.getAge() != null) {
+            patient.setAge(updateDTO.getAge());
+        }
+        
+        if (StringUtils.isNotBlank(updateDTO.getIdCard())) {
+            patient.setIdCard(updateDTO.getIdCard());
+        }
+        
+        if (StringUtils.isNotBlank(updateDTO.getRegion())) {
+            patient.setRegion(updateDTO.getRegion());
+        }
+        
+        if (StringUtils.isNotBlank(updateDTO.getAddress())) {
+            patient.setAddress(updateDTO.getAddress());
+        }
+        
+        patient.setUpdateTime(LocalDateTime.now());
+        patientService.updateById(patient);
+    }
+    
+    /**
+     * 更新医生信息
+     * @param userId 用户ID
+     * @param updateDTO 更新信息
+     */
+    private void updateDoctorInfo(Long userId, UserUpdateDTO updateDTO) {
+        // 获取医生信息
+        Doctor doctor = doctorService.getDoctorByUserId(userId);
+        if (doctor == null) {
+            throw new BusinessException("医生信息不存在");
+        }
+        
+        // 更新医生信息
+        if (StringUtils.isNotBlank(updateDTO.getName())) {
+            doctor.setName(updateDTO.getName());
+        }
+        
+        // 其他医生特有信息需要在Doctor类中定义或者扩展UserUpdateDTO
+        
+        doctor.setUpdateTime(LocalDateTime.now());
+        doctorService.updateById(doctor);
     }
 }
 

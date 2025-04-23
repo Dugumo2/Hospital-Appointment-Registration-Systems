@@ -3,6 +3,7 @@ package com.graduation.his.controller;
 import com.graduation.his.common.Result;
 import com.graduation.his.domain.dto.UserLoginDTO;
 import com.graduation.his.domain.dto.UserRegisterDTO;
+import com.graduation.his.domain.dto.UserUpdateDTO;
 import com.graduation.his.domain.vo.UserVO;
 import com.graduation.his.service.business.IAuthService;
 import lombok.RequiredArgsConstructor;
@@ -112,5 +113,22 @@ public class AuthController {
     public Result<String> updateAvatar(@RequestParam("file") MultipartFile file) {
         String avatarUrl = authService.updateAvatar(file);
         return Result.success(avatarUrl);
+    }
+    
+    /**
+     * 更新用户个人信息
+     * @param updateDTO 用户个人信息
+     * @return 更新后的用户信息
+     */
+    @PostMapping("/updateInfo")
+    public Result<UserVO> updateUserInfo(@RequestBody UserUpdateDTO updateDTO) {
+        log.info("接收到更新用户个人信息请求");
+        try {
+            UserVO userVO = authService.updateUserInfo(updateDTO);
+            return Result.success("个人信息更新成功", userVO);
+        } catch (Exception e) {
+            log.error("更新用户个人信息异常", e);
+            return Result.error(e.getMessage());
+        }
     }
 }

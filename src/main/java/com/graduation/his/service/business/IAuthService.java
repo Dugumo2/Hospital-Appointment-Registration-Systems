@@ -2,6 +2,7 @@ package com.graduation.his.service.business;
 
 import com.graduation.his.domain.dto.UserLoginDTO;
 import com.graduation.his.domain.dto.UserRegisterDTO;
+import com.graduation.his.domain.dto.UserUpdateDTO;
 import com.graduation.his.domain.vo.UserVO;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -63,4 +64,11 @@ public interface IAuthService {
      * @return 新的头像URL
      */
     String updateAvatar(MultipartFile file);
+    
+    /**
+     * 更新用户个人信息
+     * @param updateDTO 用户个人信息
+     * @return 更新后的用户信息
+     */
+    UserVO updateUserInfo(UserUpdateDTO updateDTO);
 }
