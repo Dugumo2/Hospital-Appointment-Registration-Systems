@@ -146,14 +146,6 @@ public interface IMedicalService {
     DiagnosisVO createDiagnosis(DiagnosisDTO dto);
 
     /**
-     * 更新诊断记录
-     * 
-     * @param dto 诊断记录数据传输对象
-     * @return 更新后的诊断记录对象
-     */
-    DiagnosisVO updateDiagnosis(DiagnosisDTO dto);
-
-    /**
      * 根据预约ID获取诊断记录
      * 
      * @param appointmentId 预约ID

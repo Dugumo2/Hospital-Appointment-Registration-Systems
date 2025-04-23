@@ -319,36 +319,6 @@ public class MedicalServiceController {
     }
 
     /**
-     * 更新诊断记录
-     * 
-     * @param dto 诊断记录DTO
-     * @return 更新后的诊断记录详情
-     */
-    @SaCheckRole("doctor")
-    @PutMapping("/diagnoses")
-    public Result<DiagnosisVO> updateDiagnosis(@RequestBody DiagnosisDTO dto) {
-        log.info("接收到更新诊断记录请求, diagId: {}", dto.getDiagId());
-        try {
-            // 获取当前登录用户
-            User user = medicalService.getCurrentUser();
-            
-            // 验证当前医生身份
-            if (!medicalService.isCurrentDoctor(dto.getDoctorId())) {
-                return Result.error("无权更新该诊断记录");
-            }
-            
-            DiagnosisVO diagnosis = medicalService.updateDiagnosis(dto);
-            return Result.success("更新诊断记录成功", diagnosis);
-        } catch (BusinessException e) {
-            log.error("更新诊断记录业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("更新诊断记录异常", e);
-            return Result.error("服务器异常，请稍后重试");
-        }
-    }
-
-    /**
      * 根据预约ID获取诊断记录
      * 
      * @param appointmentId 预约ID

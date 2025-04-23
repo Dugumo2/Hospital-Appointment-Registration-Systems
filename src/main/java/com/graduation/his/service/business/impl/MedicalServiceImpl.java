@@ -808,7 +808,30 @@ public class MedicalServiceImpl implements IMedicalService {
         Diagnosis existingDiagnosis = diagnosisService.getOne(queryWrapper);
         
         if (existingDiagnosis != null) {
-            throw new BusinessException("该预约已存在诊断记录，请使用更新功能");
+            throw new BusinessException("该预约已存在诊断记录，诊断记录一旦创建不可修改");
+        }
+        
+        // 校验预约是否存在且状态是否正确
+        try {
+            Appointment appointment = appointmentService.getById(dto.getAppointmentId());
+            if (appointment == null) {
+                throw new BusinessException("预约记录不存在");
+            }
+            if (!appointment.getDoctorId().equals(dto.getDoctorId())) {
+                throw new BusinessException("无权为其他医生的预约创建诊断记录");
+            }
+            if (!appointment.getPatientId().equals(dto.getPatientId())) {
+                throw new BusinessException("预约患者信息不匹配");
+            }
+            // 确保预约处于合适的状态
+            if (appointment.getStatus() != 0) { // 假设0是待就诊状态
+                throw new BusinessException("该预约状态不允许创建诊断记录");
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("校验预约信息异常", e);
+            throw new BusinessException("校验预约信息失败");
         }
         
         // 创建诊断记录
@@ -833,62 +856,10 @@ public class MedicalServiceImpl implements IMedicalService {
         
         log.info("诊断记录创建成功, diagId: {}", diagnosis.getDiagId());
         
-        // 更新预约状态为已就诊（如果有需要）
-        try {
-            updateAppointmentStatusToCompleted(dto.getAppointmentId());
-        } catch (Exception e) {
-            log.error("更新预约状态异常", e);
-        }
+        // 更新预约状态为已就诊
+        updateAppointmentStatusToCompleted(dto.getAppointmentId());
         
         // 返回诊断记录VO
-        return convertToDiagnosisVO(diagnosis);
-    }
-
-    @Override
-    public DiagnosisVO updateDiagnosis(DiagnosisDTO dto) {
-        log.info("更新诊断记录, diagId: {}", dto.getDiagId());
-        
-        // 参数验证
-        if (dto.getDiagId() == null) {
-            throw new BusinessException("诊断记录ID不能为空");
-        }
-        
-        // 获取现有诊断记录
-        Diagnosis diagnosis = diagnosisService.getById(dto.getDiagId());
-        if (diagnosis == null) {
-            throw new BusinessException("诊断记录不存在");
-        }
-        
-        // 验证操作权限
-        if (!diagnosis.getDoctorId().equals(dto.getDoctorId())) {
-            throw new BusinessException("无权操作此诊断记录");
-        }
-        
-        // 更新字段
-        if (dto.getDiagnosisResult() != null) {
-            diagnosis.setDiagnosisResult(dto.getDiagnosisResult());
-        }
-        if (dto.getExamination() != null) {
-            diagnosis.setExamination(dto.getExamination());
-        }
-        if (dto.getPrescription() != null) {
-            diagnosis.setPrescription(dto.getPrescription());
-        }
-        if (dto.getAdvice() != null) {
-            diagnosis.setAdvice(dto.getAdvice());
-        }
-        
-        diagnosis.setUpdateTime(LocalDateTime.now());
-        
-        // 保存更新
-        boolean success = diagnosisService.updateById(diagnosis);
-        if (!success) {
-            throw new BusinessException("更新诊断记录失败");
-        }
-        
-        log.info("诊断记录更新成功, diagId: {}", diagnosis.getDiagId());
-        
-        // 返回更新后的记录
         return convertToDiagnosisVO(diagnosis);
     }
 
@@ -915,6 +886,7 @@ public class MedicalServiceImpl implements IMedicalService {
 
     /**
      * 更新预约状态为已完成
+     * @param appointmentId 预约ID
      */
     private void updateAppointmentStatusToCompleted(Long appointmentId) {
         try {
@@ -938,10 +910,12 @@ public class MedicalServiceImpl implements IMedicalService {
             if (result) {
                 log.info("预约状态已更新为已完成, appointmentId: {}", appointmentId);
             } else {
-                log.warn("预约状态更新失败, appointmentId: {}", appointmentId);
+                log.error("预约状态更新失败, appointmentId: {}", appointmentId);
+                throw new BusinessException("更新预约状态失败");
             }
         } catch (Exception e) {
             log.error("更新预约状态异常", e);
+            throw new BusinessException("更新预约状态失败: " + e.getMessage());
         }
     }
 }

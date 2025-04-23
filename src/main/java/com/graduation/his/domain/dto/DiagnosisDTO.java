@@ -5,16 +5,12 @@ import java.io.Serializable;
 
 /**
  * 诊断记录数据传输对象
+ * 注意：诊断记录一旦创建不可修改，这是医疗行业的标准规范
  */
 @Data
 public class DiagnosisDTO implements Serializable {
     
     private static final long serialVersionUID = 1L;
-    
-    /**
-     * 诊断记录ID（更新时需要）
-     */
-    private Long diagId;
     
     /**
      * 预约ID
