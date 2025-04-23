@@ -39,6 +39,10 @@ import java.util.stream.Collectors;
 import java.util.Properties;
 import java.util.HashMap;
 import java.time.ZoneOffset;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.graduation.his.domain.dto.DiagnosisDTO;
+import com.graduation.his.domain.po.Appointment;
+import com.graduation.his.service.entity.IAppointmentService;
 
 /**
  * @author hua
@@ -78,6 +82,9 @@ public class MedicalServiceImpl implements IMedicalService {
     
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+    
+    @Autowired
+    private IAppointmentService appointmentService;
     
     @Override
     public List<DiagnosisVO> getPatientDiagnoses(Long patientId) {
@@ -777,5 +784,164 @@ public class MedicalServiceImpl implements IMedicalService {
         USER_ONLINE_STATUS.put(userId, isOnline);
         
         return isOnline;
+    }
+
+    @Override
+    public DiagnosisVO createDiagnosis(DiagnosisDTO dto) {
+        log.info("创建诊断记录, appointmentId: {}, doctorId: {}, patientId: {}", 
+                dto.getAppointmentId(), dto.getDoctorId(), dto.getPatientId());
+        
+        // 参数验证
+        if (dto.getAppointmentId() == null) {
+            throw new BusinessException("预约ID不能为空");
+        }
+        if (dto.getDoctorId() == null) {
+            throw new BusinessException("医生ID不能为空");
+        }
+        if (dto.getPatientId() == null) {
+            throw new BusinessException("患者ID不能为空");
+        }
+        
+        // 检查是否已存在该预约的诊断记录
+        LambdaQueryWrapper<Diagnosis> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Diagnosis::getAppointmentId, dto.getAppointmentId());
+        Diagnosis existingDiagnosis = diagnosisService.getOne(queryWrapper);
+        
+        if (existingDiagnosis != null) {
+            throw new BusinessException("该预约已存在诊断记录，请使用更新功能");
+        }
+        
+        // 创建诊断记录
+        Diagnosis diagnosis = new Diagnosis();
+        diagnosis.setAppointmentId(dto.getAppointmentId());
+        diagnosis.setDoctorId(dto.getDoctorId());
+        diagnosis.setPatientId(dto.getPatientId());
+        diagnosis.setDiagnosisResult(dto.getDiagnosisResult());
+        diagnosis.setExamination(dto.getExamination());
+        diagnosis.setPrescription(dto.getPrescription());
+        diagnosis.setAdvice(dto.getAdvice());
+        
+        LocalDateTime now = LocalDateTime.now();
+        diagnosis.setCreateTime(now);
+        diagnosis.setUpdateTime(now);
+        
+        // 保存诊断记录
+        boolean success = diagnosisService.save(diagnosis);
+        if (!success) {
+            throw new BusinessException("创建诊断记录失败");
+        }
+        
+        log.info("诊断记录创建成功, diagId: {}", diagnosis.getDiagId());
+        
+        // 更新预约状态为已就诊（如果有需要）
+        try {
+            updateAppointmentStatusToCompleted(dto.getAppointmentId());
+        } catch (Exception e) {
+            log.error("更新预约状态异常", e);
+        }
+        
+        // 返回诊断记录VO
+        return convertToDiagnosisVO(diagnosis);
+    }
+
+    @Override
+    public DiagnosisVO updateDiagnosis(DiagnosisDTO dto) {
+        log.info("更新诊断记录, diagId: {}", dto.getDiagId());
+        
+        // 参数验证
+        if (dto.getDiagId() == null) {
+            throw new BusinessException("诊断记录ID不能为空");
+        }
+        
+        // 获取现有诊断记录
+        Diagnosis diagnosis = diagnosisService.getById(dto.getDiagId());
+        if (diagnosis == null) {
+            throw new BusinessException("诊断记录不存在");
+        }
+        
+        // 验证操作权限
+        if (!diagnosis.getDoctorId().equals(dto.getDoctorId())) {
+            throw new BusinessException("无权操作此诊断记录");
+        }
+        
+        // 更新字段
+        if (dto.getDiagnosisResult() != null) {
+            diagnosis.setDiagnosisResult(dto.getDiagnosisResult());
+        }
+        if (dto.getExamination() != null) {
+            diagnosis.setExamination(dto.getExamination());
+        }
+        if (dto.getPrescription() != null) {
+            diagnosis.setPrescription(dto.getPrescription());
+        }
+        if (dto.getAdvice() != null) {
+            diagnosis.setAdvice(dto.getAdvice());
+        }
+        
+        diagnosis.setUpdateTime(LocalDateTime.now());
+        
+        // 保存更新
+        boolean success = diagnosisService.updateById(diagnosis);
+        if (!success) {
+            throw new BusinessException("更新诊断记录失败");
+        }
+        
+        log.info("诊断记录更新成功, diagId: {}", diagnosis.getDiagId());
+        
+        // 返回更新后的记录
+        return convertToDiagnosisVO(diagnosis);
+    }
+
+    @Override
+    public DiagnosisVO getDiagnosisByAppointmentId(Long appointmentId) {
+        log.info("根据预约ID获取诊断记录, appointmentId: {}", appointmentId);
+        
+        if (appointmentId == null) {
+            throw new BusinessException("预约ID不能为空");
+        }
+        
+        // 查询诊断记录
+        LambdaQueryWrapper<Diagnosis> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Diagnosis::getAppointmentId, appointmentId);
+        Diagnosis diagnosis = diagnosisService.getOne(queryWrapper);
+        
+        if (diagnosis == null) {
+            log.info("未找到预约ID: {}的诊断记录", appointmentId);
+            return null;
+        }
+        
+        return convertToDiagnosisVO(diagnosis);
+    }
+
+    /**
+     * 更新预约状态为已完成
+     */
+    private void updateAppointmentStatusToCompleted(Long appointmentId) {
+        try {
+            if (appointmentId == null) {
+                log.warn("预约ID为空，无法更新状态");
+                return;
+            }
+            
+            // 获取预约记录
+            Appointment appointment = appointmentService.getById(appointmentId);
+            if (appointment == null) {
+                log.warn("未找到预约记录: {}", appointmentId);
+                return;
+            }
+            
+            // 更新预约状态为已完成(1)
+            appointment.setStatus(1);
+            appointment.setUpdateTime(LocalDateTime.now());
+            
+            boolean result = appointmentService.updateById(appointment);
+            if (result) {
+                log.info("预约状态已更新为已完成, appointmentId: {}", appointmentId);
+            } else {
+                log.warn("预约状态更新失败, appointmentId: {}", appointmentId);
+            }
+        } catch (Exception e) {
+            log.error("更新预约状态异常", e);
+        }
     }
 }

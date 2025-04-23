@@ -521,4 +521,26 @@ public class RegistrationController {
             return Result.error("服务异常，请稍后重试");
         }
     }
+    
+    /**
+     * 检查指定预约是否已经创建了AI问诊记录
+     * 
+     * @param appointmentId 预约ID
+     * @return 是否已存在AI问诊记录
+     */
+    @SaCheckRole("patient")
+    @GetMapping("/ai-consult/exists")
+    public Result<Boolean> checkAiConsultExists(@RequestParam Long appointmentId) {
+        log.info("接收到检查预约是否已有AI问诊记录请求, appointmentId: {}", appointmentId);
+        try {
+            boolean exists = registrationService.isAiConsultExistsByAppointmentId(appointmentId);
+            return Result.success(exists ? "该预约已存在AI问诊记录" : "该预约尚未创建AI问诊记录", exists);
+        } catch (IllegalArgumentException e) {
+            log.error("检查AI问诊记录参数错误: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("检查AI问诊记录异常", e);
+            return Result.error("服务异常，请稍后重试");
+        }
+    }
 }

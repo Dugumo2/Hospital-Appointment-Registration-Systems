@@ -78,8 +78,30 @@ public class RegistrationServiceImpl implements IRegistrationService {
             throw new IllegalArgumentException("患者ID不能为空");
         }
         
+        // 检查该预约是否已存在AI问诊记录
+        if (request.getSessionId() == null && isAiConsultExistsByAppointmentId(request.getAppointmentId())) {
+            throw new BusinessException("该预约已存在AI问诊记录，请勿重复创建");
+        }
+        
         // 调用AI服务创建连接
         return aiService.createSseConnection(request);
+    }
+    
+    /**
+     * 检查指定预约是否已存在AI问诊记录
+     * 
+     * @param appointmentId 预约ID
+     * @return 是否存在
+     */
+    @Override
+    public boolean isAiConsultExistsByAppointmentId(Long appointmentId) {
+        if (appointmentId == null) {
+            throw new IllegalArgumentException("预约ID不能为空");
+        }
+        
+        LambdaQueryWrapper<AiConsultRecord> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(AiConsultRecord::getAppointmentId, appointmentId);
+        return aiService.count(queryWrapper) > 0;
     }
     
     @Override
@@ -95,6 +117,12 @@ public class RegistrationServiceImpl implements IRegistrationService {
             throw new IllegalArgumentException("问题内容不能为空");
         }
         
+        // 如果提供了预约ID但没有会话ID，检查是否已存在AI问诊记录
+        if (request.getSessionId() == null && request.getAppointmentId() != null && 
+                isAiConsultExistsByAppointmentId(request.getAppointmentId())) {
+            throw new BusinessException("该预约已存在AI问诊记录，请勿重复创建");
+        }
+        
         // 调用AI服务处理问诊请求
         String sessionId = aiService.processAiConsult(request);
         log.info("AI问诊请求已处理, 返回sessionId: {}", sessionId);
@@ -108,6 +136,12 @@ public class RegistrationServiceImpl implements IRegistrationService {
         
         if (sessionId == null || sessionId.trim().isEmpty()) {
             throw new IllegalArgumentException("会话ID不能为空");
+        }
+        
+        // 检查会话是否存在
+        ConsultSession session = aiService.getConsultSession(sessionId);
+        if (session == null) {
+            throw new BusinessException("会话不存在或已结束");
         }
         
         // 调用AI服务结束会话（会将会话保存到数据库中）

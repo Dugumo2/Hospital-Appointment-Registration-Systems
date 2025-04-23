@@ -202,4 +202,12 @@ public interface IRegistrationService {
      * @return 挂号记录详情
      */
     AppointmentVO getAppointmentDetail(Long appointmentId, Long doctorId);
+    
+    /**
+     * 检查指定预约是否已存在AI问诊记录
+     * 
+     * @param appointmentId 预约ID
+     * @return 是否存在
+     */
+    boolean isAiConsultExistsByAppointmentId(Long appointmentId);
 }

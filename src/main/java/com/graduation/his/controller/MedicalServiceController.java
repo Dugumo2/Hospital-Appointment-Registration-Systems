@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
 import com.graduation.his.common.Result;
 import com.graduation.his.domain.dto.FeedbackMessageDTO;
+import com.graduation.his.domain.dto.DiagnosisDTO;
 import com.graduation.his.domain.po.User;
 import com.graduation.his.domain.vo.DiagnosisVO;
 import com.graduation.his.exception.BusinessException;
@@ -283,6 +284,101 @@ public class MedicalServiceController {
             return Result.error(e.getMessage());
         } catch (Exception e) {
             log.error("标记消息为已读异常", e);
+            return Result.error("服务器异常，请稍后重试");
+        }
+    }
+
+    /**
+     * 创建诊断记录
+     * 
+     * @param dto 诊断记录DTO
+     * @return 诊断记录详情
+     */
+    @SaCheckRole("doctor")
+    @PostMapping("/diagnoses")
+    public Result<DiagnosisVO> createDiagnosis(@RequestBody DiagnosisDTO dto) {
+        log.info("接收到创建诊断记录请求");
+        try {
+            // 获取当前登录用户
+            User user = medicalService.getCurrentUser();
+            
+            // 验证当前医生身份
+            if (!medicalService.isCurrentDoctor(dto.getDoctorId())) {
+                return Result.error("无权创建该诊断记录");
+            }
+            
+            DiagnosisVO diagnosis = medicalService.createDiagnosis(dto);
+            return Result.success("创建诊断记录成功", diagnosis);
+        } catch (BusinessException e) {
+            log.error("创建诊断记录业务异常: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("创建诊断记录异常", e);
+            return Result.error("服务器异常，请稍后重试");
+        }
+    }
+
+    /**
+     * 更新诊断记录
+     * 
+     * @param dto 诊断记录DTO
+     * @return 更新后的诊断记录详情
+     */
+    @SaCheckRole("doctor")
+    @PutMapping("/diagnoses")
+    public Result<DiagnosisVO> updateDiagnosis(@RequestBody DiagnosisDTO dto) {
+        log.info("接收到更新诊断记录请求, diagId: {}", dto.getDiagId());
+        try {
+            // 获取当前登录用户
+            User user = medicalService.getCurrentUser();
+            
+            // 验证当前医生身份
+            if (!medicalService.isCurrentDoctor(dto.getDoctorId())) {
+                return Result.error("无权更新该诊断记录");
+            }
+            
+            DiagnosisVO diagnosis = medicalService.updateDiagnosis(dto);
+            return Result.success("更新诊断记录成功", diagnosis);
+        } catch (BusinessException e) {
+            log.error("更新诊断记录业务异常: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("更新诊断记录异常", e);
+            return Result.error("服务器异常，请稍后重试");
+        }
+    }
+
+    /**
+     * 根据预约ID获取诊断记录
+     * 
+     * @param appointmentId 预约ID
+     * @return 诊断记录详情，如果不存在则返回null
+     */
+    @SaCheckRole(value = {"doctor", "patient"},mode = SaMode.OR)
+    @GetMapping("/appointment/{appointmentId}/diagnosis")
+    public Result<DiagnosisVO> getDiagnosisByAppointmentId(@PathVariable Long appointmentId) {
+        log.info("接收到根据预约ID获取诊断记录请求, appointmentId: {}", appointmentId);
+        try {
+            DiagnosisVO diagnosis = medicalService.getDiagnosisByAppointmentId(appointmentId);
+            
+            if (diagnosis == null) {
+                return Result.success("该预约尚未有诊断记录", null);
+            }
+            
+            // 获取当前登录用户
+            User user = medicalService.getCurrentUser();
+            
+            // 验证是否为管理员、当前患者或当前医生
+            if (user.getRole() != 2 && !medicalService.isCurrentPatient(diagnosis.getPatientId()) && !medicalService.isCurrentDoctor(diagnosis.getDoctorId())) {
+                return Result.error("无权访问该诊断记录");
+            }
+            
+            return Result.success("获取诊断记录成功", diagnosis);
+        } catch (BusinessException e) {
+            log.error("获取诊断记录业务异常: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("获取诊断记录异常", e);
             return Result.error("服务器异常，请稍后重试");
         }
     }

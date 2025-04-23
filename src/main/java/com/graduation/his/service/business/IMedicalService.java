@@ -3,6 +3,8 @@ package com.graduation.his.service.business;
 import com.graduation.his.domain.dto.FeedbackMessageDTO;
 import com.graduation.his.domain.po.User;
 import com.graduation.his.domain.vo.DiagnosisVO;
+import com.graduation.his.domain.dto.DiagnosisDTO;
+import com.graduation.his.domain.po.Diagnosis;
 
 import java.util.List;
 import java.util.Map;
@@ -134,4 +136,28 @@ public interface IMedicalService {
      * @param count 增加的数量
      */
     void updateUnreadMessageCountAsync(Long entityId, Long diagId, int count);
+
+    /**
+     * 创建诊断记录
+     * 
+     * @param dto 诊断记录数据传输对象
+     * @return 诊断记录对象
+     */
+    DiagnosisVO createDiagnosis(DiagnosisDTO dto);
+
+    /**
+     * 更新诊断记录
+     * 
+     * @param dto 诊断记录数据传输对象
+     * @return 更新后的诊断记录对象
+     */
+    DiagnosisVO updateDiagnosis(DiagnosisDTO dto);
+
+    /**
+     * 根据预约ID获取诊断记录
+     * 
+     * @param appointmentId 预约ID
+     * @return 诊断记录，如果不存在则返回null
+     */
+    DiagnosisVO getDiagnosisByAppointmentId(Long appointmentId);
 }
