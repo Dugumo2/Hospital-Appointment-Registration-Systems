@@ -275,7 +275,7 @@ public class RegistrationController {
      */
     @SaCheckRole(value = {"admin","patient"},mode = SaMode.OR)
     @PostMapping("/schedules")
-    public Result<List<ScheduleListVO>> getScheduleList(ScheduleQuery query) {
+    public Result<List<ScheduleListVO>> getScheduleList(@RequestBody ScheduleQuery query) {
         log.info("接收到获取排班列表请求, 查询条件: {}", query);
         try {
             List<ScheduleListVO> scheduleVOs = registrationService.getScheduleListVO(query);
@@ -332,7 +332,7 @@ public class RegistrationController {
      */
     @SaCheckRole(value = {"admin","patient"},mode = SaMode.OR)
     @PostMapping("/doctor-schedules")
-    public Result<List<ScheduleListVO>> getDoctorSchedules(ScheduleQuery query) {
+    public Result<List<ScheduleListVO>> getDoctorSchedules(@RequestBody ScheduleQuery query) {
         if (query == null || query.getDoctorId() == null) {
             return Result.error("医生ID不能为空");
         }

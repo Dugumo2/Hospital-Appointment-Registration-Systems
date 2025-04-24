@@ -194,7 +194,10 @@ public class AuthServiceImpl implements IAuthService {
         StpUtil.login(user.getId(), loginDTO.getRememberMe());
         
         // 获取患者信息
-        Patient patient = patientService.getByUserId(user.getId());
+        Patient patient = null;
+        if (user.getRole() == 0) {
+            patient = patientService.getByUserId(user.getId());
+        }
         
         // 构建用户信息视图对象
         UserVO userVO = buildUserVO(user, patient);
@@ -223,7 +226,10 @@ public class AuthServiceImpl implements IAuthService {
             throw new BusinessException("用户不存在");
         }
         
-        Patient patient = patientService.getByUserId(userId);
+        Patient patient = null;
+        if (user.getRole() == 0) {
+            patient = patientService.getByUserId(userId);
+        }
         
         return buildUserVO(user, patient);
     }
@@ -254,6 +260,19 @@ public class AuthServiceImpl implements IAuthService {
                     userVO.setIdCard(idCard.substring(0, 4) + "********" + idCard.substring(idCard.length() - 4));
                 } else {
                     userVO.setIdCard(idCard);
+                }
+            }
+        }
+        
+        // 如果是医生角色，则获取医生信息
+        if (user.getRole() == 1) {
+            Doctor doctor = doctorService.getDoctorByUserId(user.getId());
+            if (doctor != null) {
+                userVO.setDoctorId(doctor.getDoctorId());
+                // 如果患者信息为空，则使用医生的姓名等基本信息
+                if (patient == null) {
+                    userVO.setName(doctor.getName());
+                    // 其他医生信息根据需要设置
                 }
             }
         }
