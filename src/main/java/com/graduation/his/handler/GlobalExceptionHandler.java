@@ -2,11 +2,21 @@ package com.graduation.his.handler;
 
 import cn.dev33.satoken.exception.NotLoginException;
 import com.graduation.his.common.Result;
+import com.graduation.his.exception.BusinessException;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // 处理 BusinessException
+    @ExceptionHandler(BusinessException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST) // 设置为 400
+    public Result handleBusinessException(BusinessException e) {
+        return Result.error(e.getCode(), e.getMessage());
+    }
 
     //处理异常
     @ExceptionHandler(Exception.class) //指定能够处理的异常类型
