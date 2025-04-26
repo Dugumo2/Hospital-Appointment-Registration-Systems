@@ -9,7 +9,7 @@ public class BusinessException extends RuntimeException {
     private String message;
 
     public BusinessException(String message) {
-        this.code = 500;
+        this.code = 400;
         this.message = message;
     }
 

@@ -51,8 +51,9 @@ public class MedicalServiceController {
             List<DiagnosisVO> diagnoses = medicalService.getPatientDiagnoses(patientId);
             return Result.success("获取患者诊断记录成功", diagnoses);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("获取患者诊断记录业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取患者诊断记录异常", e);
             return Result.error("服务器异常，请稍后重试");
@@ -81,8 +82,9 @@ public class MedicalServiceController {
             List<DiagnosisVO> diagnoses = medicalService.getDoctorDiagnoses(doctorId);
             return Result.success("获取医生诊断记录成功", diagnoses);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("获取医生诊断记录业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取医生诊断记录异常", e);
             return Result.error("服务器异常，请稍后重试");
@@ -112,8 +114,9 @@ public class MedicalServiceController {
             
             return Result.success("获取诊断详情成功", diagnosis);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("获取诊断详情业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取诊断详情异常", e);
             return Result.error("服务器异常，请稍后重试");
@@ -151,8 +154,9 @@ public class MedicalServiceController {
             List<FeedbackMessageDTO> messages = medicalService.getFeedbackMessages(diagId);
             return Result.success("获取反馈消息成功", messages);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("获取反馈消息业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取反馈消息异常", e);
             return Result.error("服务器异常，请稍后重试");
@@ -201,8 +205,9 @@ public class MedicalServiceController {
             FeedbackMessageDTO message = medicalService.sendFeedbackMessage(diagId, content, senderType, senderId);
             return Result.success("发送反馈消息成功", message);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("发送反馈消息业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("发送反馈消息异常", e);
             return Result.error("服务器异常，请稍后重试");
@@ -237,8 +242,9 @@ public class MedicalServiceController {
             Map<String, Integer> counts = medicalService.getAllUnreadMessageCounts(entityId, user.getRole());
             return Result.success("获取未读消息数量成功", counts);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("获取未读消息数量业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取未读消息数量异常", e);
             return Result.error("服务器异常，请稍后重试");
@@ -280,8 +286,9 @@ public class MedicalServiceController {
             boolean result = medicalService.markAllMessagesAsRead(diagId, entityId, user.getRole());
             return Result.success(result ? "标记成功" : "标记失败", result);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("标记消息为已读业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("标记消息为已读异常", e);
             return Result.error("服务器异常，请稍后重试");
@@ -310,8 +317,9 @@ public class MedicalServiceController {
             DiagnosisVO diagnosis = medicalService.createDiagnosis(dto);
             return Result.success("创建诊断记录成功", diagnosis);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("创建诊断记录业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("创建诊断记录异常", e);
             return Result.error("服务器异常，请稍后重试");
@@ -345,8 +353,9 @@ public class MedicalServiceController {
             
             return Result.success("获取诊断记录成功", diagnosis);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("获取诊断记录业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取诊断记录异常", e);
             return Result.error("服务器异常，请稍后重试");

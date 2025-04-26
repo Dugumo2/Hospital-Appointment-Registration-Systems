@@ -56,6 +56,10 @@ public class RegistrationController {
         try {
             List<Department> departments = registrationService.getDepartmentList(onlyActive);
             return Result.success("获取科室列表成功", departments);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取科室列表业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取科室列表异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -78,6 +82,10 @@ public class RegistrationController {
         try {
             List<Clinic> clinics = registrationService.getClinicList(deptId, onlyActive);
             return Result.success("获取门诊列表成功", clinics);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取门诊列表业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取门诊列表异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -103,6 +111,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("搜索门诊列表参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("搜索门诊列表业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("搜索门诊列表异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -129,7 +141,12 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("创建AI问诊SSE连接参数错误: {}", e.getMessage());
             throw e;
+        }  catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("业务规则校验失败: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
+            // 其他未知异常转换为用户友好提示
             log.error("创建AI问诊SSE连接异常", e);
             throw new RuntimeException("服务异常，请稍后重试");
         }
@@ -154,6 +171,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("AI问诊请求参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("AI问诊请求业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("AI问诊请求异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -180,6 +201,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("结束AI问诊会话参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("结束AI问诊会话业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("结束AI问诊会话异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -209,6 +234,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("获取AI问诊历史会话参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取AI问诊历史会话业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取AI问诊历史会话异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -233,6 +262,10 @@ public class RegistrationController {
         try {
             List<DoctorVO> doctorVOs = registrationService.getDoctorListVO(deptId, name, clinicId);
             return Result.success("获取医生列表成功", doctorVOs);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取医生列表业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取医生列表异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -255,6 +288,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("获取医生详情参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取医生详情业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取医生详情异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -280,6 +317,10 @@ public class RegistrationController {
         try {
             List<ScheduleListVO> scheduleVOs = registrationService.getScheduleListVO(query);
             return Result.success("获取排班列表成功", scheduleVOs);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取排班列表业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取排班列表异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -314,6 +355,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("获取排班详情参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取排班详情业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取排班详情异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -353,6 +398,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("获取医生排班参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取医生排班业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取医生排班异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -380,6 +429,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("创建预约挂号参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("创建预约挂号业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("创建预约挂号异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -405,6 +458,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("取消预约挂号参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("取消预约挂号业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("取消预约挂号异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -430,6 +487,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("获取患者预约记录参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取患者预约记录业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取患者预约记录异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -457,6 +518,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("获取医生预约记录参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取医生预约记录业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取医生预约记录异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -483,8 +548,9 @@ public class RegistrationController {
             AppointmentVO vo = registrationService.getAppointmentDetail(appointmentId, doctorId);
             return Result.success("获取挂号记录详情成功", vo);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("获取挂号记录详情业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取挂号记录详情异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -514,8 +580,9 @@ public class RegistrationController {
             }
             return Result.success("获取AI问诊记录成功", session);
         } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
             log.error("获取挂号关联的AI问诊记录业务异常: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取挂号关联的AI问诊记录异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -538,6 +605,10 @@ public class RegistrationController {
         } catch (IllegalArgumentException e) {
             log.error("检查AI问诊记录参数错误: {}", e.getMessage());
             return Result.error(e.getMessage());
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("检查AI问诊记录业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("检查AI问诊记录异常", e);
             return Result.error("服务异常，请稍后重试");

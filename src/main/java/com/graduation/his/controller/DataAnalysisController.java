@@ -2,6 +2,7 @@ package com.graduation.his.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import com.graduation.his.common.Result;
+import com.graduation.his.exception.BusinessException;
 import com.graduation.his.service.business.IDataAnalysisService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,10 @@ public class DataAnalysisController {
         try {
             Map<String, Integer> data = dataAnalysisService.getPatientVisitFrequency(startDate, endDate, timeUnit);
             return Result.success("获取患者就诊频次统计成功", data);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取患者就诊频次统计业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取患者就诊频次统计异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -68,6 +73,10 @@ public class DataAnalysisController {
         try {
             Map<String, Integer> data = dataAnalysisService.getAiConsultFrequency(startDate, endDate, timeUnit);
             return Result.success("获取AI问诊使用频率统计成功", data);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取AI问诊使用频率统计业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取AI问诊使用频率统计异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -85,6 +94,10 @@ public class DataAnalysisController {
         try {
             Map<String, Integer> data = dataAnalysisService.getPatientAgeDistribution();
             return Result.success("获取患者年龄分布统计成功", data);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取患者年龄分布统计业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取患者年龄分布统计异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -102,6 +115,10 @@ public class DataAnalysisController {
         try {
             Map<String, Integer> data = dataAnalysisService.getPatientGenderRatio();
             return Result.success("获取患者性别比例统计成功", data);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取患者性别比例统计业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取患者性别比例统计异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -119,6 +136,10 @@ public class DataAnalysisController {
         try {
             Map<String, Integer> data = dataAnalysisService.getPatientRegionalDistribution();
             return Result.success("获取患者地区分布统计成功", data);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取患者地区分布统计业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取患者地区分布统计异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -140,6 +161,10 @@ public class DataAnalysisController {
         try {
             Map<String, Integer> data = dataAnalysisService.getDoctorWorkloadStatistics(startDate, endDate);
             return Result.success("获取医生工作量统计成功", data);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取医生工作量统计业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取医生工作量统计异常", e);
             return Result.error("服务异常，请稍后重试");
@@ -161,6 +186,10 @@ public class DataAnalysisController {
         try {
             Map<String, Integer> data = dataAnalysisService.getDepartmentWorkloadStatistics(startDate, endDate);
             return Result.success("获取科室工作量统计成功", data);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取科室工作量统计业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("获取科室工作量统计异常", e);
             return Result.error("服务异常，请稍后重试");

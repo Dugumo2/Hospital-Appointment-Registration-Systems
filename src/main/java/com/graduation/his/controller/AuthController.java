@@ -5,6 +5,7 @@ import com.graduation.his.domain.dto.UserLoginDTO;
 import com.graduation.his.domain.dto.UserRegisterDTO;
 import com.graduation.his.domain.dto.UserUpdateDTO;
 import com.graduation.his.domain.vo.UserVO;
+import com.graduation.his.exception.BusinessException;
 import com.graduation.his.service.business.IAuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -126,6 +127,10 @@ public class AuthController {
         try {
             UserVO userVO = authService.updateUserInfo(updateDTO);
             return Result.success("个人信息更新成功", userVO);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("更新用户个人信息业务异常: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("更新用户个人信息异常", e);
             return Result.error(e.getMessage());
