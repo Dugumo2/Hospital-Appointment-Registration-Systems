@@ -3,6 +3,7 @@ package com.graduation.his.service.business;
 import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
+import com.graduation.his.domain.dto.MessageRecord;
 import com.graduation.his.domain.po.Appointment;
 import com.graduation.his.domain.po.Clinic;
 import com.graduation.his.domain.po.Department;
@@ -49,7 +50,7 @@ public interface IRegistrationService {
     boolean endAiConsultSession(String sessionId);
     
     /**
-     * 获取AI问诊历史会话（优先从Redis获取，Redis不存在则从数据库获取）
+     * 获取AI问诊历史会话（从Redis获取）
      * @param sessionId 会话ID
      * @return 会话详情
      */
@@ -210,4 +211,12 @@ public interface IRegistrationService {
      * @return 是否存在
      */
     boolean isAiConsultExistsByAppointmentId(Long appointmentId);
+    
+    /**
+     * 获取预约相关的消息记录
+     * @param appointmentId 预约ID
+     * @param userId 当前登录用户ID，用于权限验证
+     * @return 消息记录列表
+     */
+    List<MessageRecord> getAppointmentMessageHistory(Long appointmentId, Long userId);
 }

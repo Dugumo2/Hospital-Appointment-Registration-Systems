@@ -6,6 +6,7 @@ import com.graduation.his.common.Result;
 import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
+import com.graduation.his.domain.dto.MessageRecord;
 import com.graduation.his.domain.po.*;
 import com.graduation.his.domain.query.ScheduleQuery;
 import com.graduation.his.domain.vo.AppointmentVO;
@@ -558,38 +559,6 @@ public class RegistrationController {
     }
     
     /**
-     * 医生查看挂号关联的AI问诊记录
-     * 
-     * 查询特定挂号记录绑定的AI问诊记录详情
-     * 如果该挂号没有关联的AI问诊记录，则返回null
-     * 
-     * @param appointmentId 挂号记录ID
-     * @param doctorId 医生ID，用于权限验证
-     * @return AI问诊会话详情
-     */
-    @SaCheckRole("doctor")
-    @GetMapping("/doctor/{doctorId}/appointment/{appointmentId}/ai-consult")
-    public Result<ConsultSession> getAiConsultByAppointment(
-            @PathVariable Long doctorId,
-            @PathVariable Long appointmentId) {
-        log.info("接收到查询挂号关联的AI问诊记录请求, doctorId: {}, appointmentId: {}", doctorId, appointmentId);
-        try {
-            ConsultSession session = registrationService.getAiConsultByAppointmentId(appointmentId, doctorId);
-            if (session == null) {
-                return Result.success("该挂号记录没有关联的AI问诊记录", null);
-            }
-            return Result.success("获取AI问诊记录成功", session);
-        } catch (BusinessException e) {
-            // 业务异常直接抛出（由全局异常处理器处理）
-            log.error("获取挂号关联的AI问诊记录业务异常: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.error("获取挂号关联的AI问诊记录异常", e);
-            return Result.error("服务异常，请稍后重试");
-        }
-    }
-    
-    /**
      * 检查指定预约是否已经创建了AI问诊记录
      * 
      * @param appointmentId 预约ID
@@ -611,6 +580,35 @@ public class RegistrationController {
             throw e;
         } catch (Exception e) {
             log.error("检查AI问诊记录异常", e);
+            return Result.error("服务异常，请稍后重试");
+        }
+    }
+    
+    /**
+     * 获取预约相关的消息记录
+     * 
+     * 获取预约相关的所有消息记录，支持医生、患者和管理员访问
+     * 访问权限由service层根据当前登录用户判断
+     * 
+     * @param appointmentId 预约ID
+     * @return 消息记录列表
+     */
+    @SaCheckRole(value = {"doctor", "patient", "admin"}, mode = SaMode.OR)
+    @GetMapping("/message-history/{appointmentId}")
+    public Result<List<MessageRecord>> getAppointmentMessageHistory(@PathVariable Long appointmentId) {
+        log.info("接收到获取预约消息记录请求, appointmentId: {}", appointmentId);
+        try {
+            // 获取当前登录用户ID
+            Long userId = StpUtil.getLoginIdAsLong();
+            
+            List<MessageRecord> messageHistory = registrationService.getAppointmentMessageHistory(appointmentId, userId);
+            return Result.success("获取预约消息记录成功", messageHistory);
+        } catch (BusinessException e) {
+            // 业务异常直接抛出（由全局异常处理器处理）
+            log.error("获取预约消息记录业务异常: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("获取预约消息记录异常", e);
             return Result.error("服务异常，请稍后重试");
         }
     }

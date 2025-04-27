@@ -1,11 +1,15 @@
 package com.graduation.his.service.business.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.graduation.his.exception.BusinessException;
 import com.graduation.his.domain.dto.AiConsultConnectionRequest;
 import com.graduation.his.domain.dto.AiConsultRequest;
 import com.graduation.his.domain.dto.ConsultSession;
+import com.graduation.his.domain.dto.MessageRecord;
 import com.graduation.his.domain.po.AiConsultRecord;
 import com.graduation.his.domain.po.Appointment;
 import com.graduation.his.domain.po.Clinic;
@@ -13,19 +17,26 @@ import com.graduation.his.domain.po.Department;
 import com.graduation.his.domain.po.Doctor;
 import com.graduation.his.domain.po.Patient;
 import com.graduation.his.domain.po.Schedule;
+import com.graduation.his.domain.po.User;
 import com.graduation.his.domain.query.ScheduleQuery;
 import com.graduation.his.domain.vo.AppointmentVO;
 import com.graduation.his.domain.vo.DoctorVO;
 import com.graduation.his.domain.vo.ScheduleDetailVO;
 import com.graduation.his.domain.vo.ScheduleListVO;
 import com.graduation.his.service.business.IRegistrationService;
-import com.graduation.his.service.entity.*;
+import com.graduation.his.service.entity.IAIService;
+import com.graduation.his.service.entity.IAppointmentService;
+import com.graduation.his.service.entity.IClinicService;
+import com.graduation.his.service.entity.IDepartmentService;
+import com.graduation.his.service.entity.IDoctorService;
+import com.graduation.his.service.entity.IPatientService;
+import com.graduation.his.service.entity.IScheduleService;
+import com.graduation.his.service.entity.IUserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDate;
@@ -64,6 +75,9 @@ public class RegistrationServiceImpl implements IRegistrationService {
     
     @Autowired
     private IPatientService patientService;
+    
+    @Autowired
+    private IUserService userService;
     
     @Override
     public SseEmitter createAiConsultConnection(AiConsultConnectionRequest request) {
@@ -159,7 +173,7 @@ public class RegistrationServiceImpl implements IRegistrationService {
             throw new IllegalArgumentException("会话ID不能为空");
         }
         
-        // 调用AI服务获取会话历史（优先从Redis获取，如Redis不存在则从数据库获取）
+        // 调用AI服务获取会话历史（从Redis获取）
         ConsultSession session = aiService.getConsultSession(sessionId);
         
         if (session == null) {
@@ -1039,5 +1053,80 @@ public class RegistrationServiceImpl implements IRegistrationService {
         }
         
         return clinics;
+    }
+
+    /**
+     * 获取预约相关的消息记录
+     * @param appointmentId 预约ID
+     * @param userId 当前登录用户ID，用于权限验证
+     * @return 消息记录列表
+     */
+    @Override
+    public List<MessageRecord> getAppointmentMessageHistory(Long appointmentId, Long userId) {
+        log.info("获取预约消息记录, appointmentId: {}, userId: {}", appointmentId, userId);
+        
+        if (appointmentId == null) {
+            throw new BusinessException("预约ID不能为空");
+        }
+        
+        if (userId == null) {
+            throw new BusinessException("用户ID不能为空");
+        }
+        
+        // 获取预约记录
+        Appointment appointment = appointmentService.getById(appointmentId);
+        if (appointment == null) {
+            throw new BusinessException("预约记录不存在");
+        }
+        
+        // 获取当前用户信息和角色
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        
+        // 根据角色验证权限
+        if (user.getRole() != 2) { // 非管理员
+            // 如果是医生角色，验证医生ID
+            if (user.getRole() == 1) {
+                Doctor doctor = doctorService.getDoctorByUserId(userId);
+                if (doctor == null || !doctor.getDoctorId().equals(appointment.getDoctorId())) {
+                    throw new BusinessException("无权查看该预约的消息记录");
+                }
+            } 
+            // 如果是患者角色，验证患者ID
+            else if (user.getRole() == 0) {
+                Patient patient = patientService.getByUserId(userId);
+                if (patient == null || !patient.getPatientId().equals(appointment.getPatientId())) {
+                    throw new BusinessException("无权查看该预约的消息记录");
+                }
+            }
+            else {
+                throw new BusinessException("无权查看该预约的消息记录");
+            }
+        }
+        
+        // 查询关联的AI问诊记录
+        try {
+            // 查询AI问诊记录
+            LambdaQueryWrapper<AiConsultRecord> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(AiConsultRecord::getAppointmentId, appointmentId);
+            AiConsultRecord aiRecord = aiService.getOne(queryWrapper);
+            
+            if (aiRecord != null) {
+                // 获取对话历史
+                String conversationJson = aiRecord.getConversation();
+                if (conversationJson != null && !conversationJson.isEmpty()) {
+                    // 使用FastJSON解析消息历史
+                    return JSON.parseArray(conversationJson, MessageRecord.class);
+                }
+            }
+            
+            // 如果没有找到AI问诊记录或消息历史为空，返回空列表
+            return new ArrayList<>();
+        } catch (Exception e) {
+            log.error("查询AI问诊记录异常", e);
+            throw new BusinessException("查询消息记录失败: " + e.getMessage());
+        }
     }
 }

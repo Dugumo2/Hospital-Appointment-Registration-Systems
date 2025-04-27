@@ -760,48 +760,6 @@ public class AIServiceImpl extends ServiceImpl<AiConsultRecordMapper, AiConsultR
         try {
             // 先从Redis中获取
             ConsultSession session = getSessionFromRedis(sessionId);
-            if (session != null) {
-                return session;
-            }
-            
-            // Redis中不存在，从数据库中加载
-            Long recordId;
-            try {
-                // 尝试移除UUID中的连字符并转为Long
-                recordId = Long.parseLong(sessionId.replaceAll("-", ""), 16);
-                // 取绝对值避免负数，并截断为16位数字
-                recordId = Math.abs(recordId % 10000000000000000L);
-            } catch (NumberFormatException e) {
-                // 如果无法解析，使用哈希码
-                recordId = (long) sessionId.hashCode();
-                if (recordId < 0) {
-                    recordId = -recordId;
-                }
-            }
-            
-            // 查询记录
-            AiConsultRecord record = getOne(new LambdaQueryWrapper<AiConsultRecord>()
-                    .eq(AiConsultRecord::getRecordId, recordId));
-            
-            if (record == null) {
-                return null;
-            }
-            
-            // 解析对话历史
-            List<MessageRecord> messageHistory = JSON.parseArray(record.getConversation(), MessageRecord.class);
-            
-            // 构建会话
-            session = ConsultSession.builder()
-                    .sessionId(sessionId)
-                    .patientId(record.getPatientId())
-                    .appointmentId(record.getAppointmentId())
-                    .status(record.getStatus())
-                    .messageHistory(messageHistory)
-                    .version(record.getVersion())
-                    .build();
-            
-            // 将会话缓存到Redis
-            saveSessionToRedis(session);
             
             return session;
         } catch (Exception e) {

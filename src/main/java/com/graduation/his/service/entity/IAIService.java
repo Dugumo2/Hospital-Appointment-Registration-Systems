@@ -39,7 +39,7 @@ public interface IAIService extends IService<AiConsultRecord> {
     boolean saveConsultRecord(String sessionId);
     
     /**
-     * 获取历史对话会话（优先从Redis获取，Redis不存在则从数据库获取）
+     * 获取历史对话会话（从Redis获取）
      * @param sessionId 会话ID
      * @return 对话会话详情
      */
