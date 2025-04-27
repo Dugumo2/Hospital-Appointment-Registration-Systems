@@ -585,7 +585,7 @@ public class RegistrationController {
     }
     
     /**
-     * 获取预约相关的消息记录
+     * 获取预约相关的AI问诊消息记录
      * 
      * 获取预约相关的所有消息记录，支持医生、患者和管理员访问
      * 访问权限由service层根据当前登录用户判断

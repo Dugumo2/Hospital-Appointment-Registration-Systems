@@ -38,7 +38,7 @@ public class FeedbackMessage implements Serializable {
     private Long diagId;
 
     /**
-     * 发送者类型（1-医生，2-患者）
+     * 发送者类型（0-患者,1-医生）
      */
     private Integer senderType;
 
@@ -46,11 +46,6 @@ public class FeedbackMessage implements Serializable {
      * 发送者ID
      */
     private Long senderId;
-
-    /**
-     * 发送者姓名
-     */
-    private String senderName;
 
     /**
      * 消息内容
@@ -66,9 +61,4 @@ public class FeedbackMessage implements Serializable {
      * 创建时间
      */
     private LocalDateTime createTime;
-
-    /**
-     * 更新时间
-     */
-    private LocalDateTime updateTime;
 }
