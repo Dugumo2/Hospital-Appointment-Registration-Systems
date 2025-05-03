@@ -112,6 +112,11 @@ public class RedissonService implements IRedisService {
         return map.get(field);
     }
 
+    public Integer getIntFromMap(String key, String field) {
+        RMap<String, Integer> map = redissonClient.getMap(key);
+        return map.get(field);
+    }
+
     @Override
     public <K, V> V getFromMap(String key, K field) {
         return redissonClient.<K, V>getMap(key).get(field);

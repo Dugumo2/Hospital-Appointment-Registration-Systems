@@ -349,24 +349,12 @@ public class MedicalServiceImpl implements IMedicalService {
             log.warn("获取未读消息数量参数错误: entityId={}, diagId={}", entityId, diagId);
             return 0;
         }
-        
+
+        try {
         // 从Redis Hash中获取特定诊断的未读消息数量
         String redisKey = Constants.RedisKey.MESSAGE_USER + entityId;
-        Object value = redisService.getFromMap(redisKey, diagId.toString());
-        
-        if (value == null) {
-            return 0;
-        }
-        
-        try {
-            if (value instanceof Integer) {
-                return (Integer) value;
-            } else if (value instanceof String) {
-                return Integer.parseInt((String) value);
-            } else {
-                log.warn("Redis中存储的未读消息数量类型异常: {}", value.getClass().getName());
-                return 0;
-            }
+        Integer value = redisService.getIntFromMap(redisKey, diagId.toString());
+            return value != null ? value : 0;
         } catch (Exception e) {
             log.error("解析Redis中的未读消息数量异常", e);
             return 0;

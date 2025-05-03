@@ -262,4 +262,13 @@ public interface IRedisService {
     void setAtomicLong(String key, Integer value);
 
     Boolean setNx(String lockKey);
+
+    /**
+     * 获取哈希表中指定字段的整数值
+     *
+     * @param key   键
+     * @param field 字段
+     * @return 值
+     */
+    Integer getIntFromMap(String key, String field);
 }
