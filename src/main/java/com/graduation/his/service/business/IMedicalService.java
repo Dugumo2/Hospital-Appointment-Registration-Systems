@@ -66,11 +66,11 @@ public interface IMedicalService {
     
     /**
      * 获取用户的特定诊断的未读消息数量
-     * @param entityId 实体ID（患者ID或医生ID）
+     * @param userId 用户ID
      * @param diagId 诊断ID
      * @return 未读消息数量
      */
-    int getUnreadMessageCount(Long entityId, Long diagId);
+    int getUnreadMessageCount(Long userId, Long diagId);
     
     /**
      * 获取用户的所有诊断未读消息数量映射
@@ -131,11 +131,11 @@ public interface IMedicalService {
     
     /**
      * 异步更新用户未读消息数量
-     * @param entityId 实体ID（患者ID或医生ID）
+     * @param userId 用户ID
      * @param diagId 诊断ID
      * @param count 增加的数量
      */
-    void updateUnreadMessageCountAsync(Long entityId, Long diagId, int count);
+    void updateUnreadMessageCountAsync(Long userId, Long diagId, int count);
 
     /**
      * 创建诊断记录

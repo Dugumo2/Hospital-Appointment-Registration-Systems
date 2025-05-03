@@ -23,7 +23,9 @@ public class QueueCreateTest {
         RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactory);
 
         // 3. 构建队列参数
-        String queueName = "user.queue.17";
+        // 使用用户ID作为队列名后缀（而不是实体ID）
+        Long userId = 17L;
+        String queueName = "user.queue." + userId;
         Map<String, Object> args = new HashMap<>();
         args.put("x-dead-letter-exchange", "dead.letter.exchange");
         args.put("x-dead-letter-routing-key", "dead.letter.routing.key");

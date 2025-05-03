@@ -227,7 +227,7 @@ public class MedicalServiceImpl implements IMedicalService {
         if (isOnline) {
             // 即使用户在线通过WebSocket直接收到消息，也应该更新Redis中的未读消息计数
             // 因为用户可能没有查看该消息
-            updateUnreadMessageCountAsync(receiverEntityId, diagId, 1);
+            updateUnreadMessageCountAsync(receiverUserId, diagId, 1);
             
             // 通过WebSocket点对点发送消息
             // 1. 发送消息内容
@@ -237,15 +237,15 @@ public class MedicalServiceImpl implements IMedicalService {
             int receiverRole = (senderType == 0) ? 1 : 0; // 如果发送者是患者(0)，接收者是医生(1)，反之亦然
             sendUnreadCountersToWebSocket(receiverUserId, receiverEntityId, receiverRole);
         } else {
-            // 确保用户专属队列存在
-            ensureUserQueueExists(receiverEntityId);
+            // 确保用户专属队列存在 - 使用用户ID
+            ensureUserQueueExists(receiverUserId);
             
-            // 通过RabbitMQ异步发送消息，使用实体ID作为路由键
-            String routingKey = Constants.MessageKey.USER_ROUTING_KEY_PREFIX + receiverEntityId;
+            // 通过RabbitMQ异步发送消息，使用用户ID作为路由键
+            String routingKey = Constants.MessageKey.USER_ROUTING_KEY_PREFIX + receiverUserId;
             sendToRabbitMQAsync(Constants.MessageKey.FEEDBACK_MESSAGE_QUEUE, routingKey, messageDTO);
             
-            // 异步更新未读消息数量 - 使用实体ID，保持与数据库记录一致
-            updateUnreadMessageCountAsync(receiverEntityId, diagId, 1);
+            // 异步更新未读消息数量 - 使用用户ID
+            updateUnreadMessageCountAsync(receiverUserId, diagId, 1);
         }
         
         return messageDTO;
@@ -319,20 +319,23 @@ public class MedicalServiceImpl implements IMedicalService {
         
         // 2. 清空Redis中的未读消息计数
         try {
-            String redisKey = Constants.RedisKey.MESSAGE_USER + entityId;
+            // 获取用户ID
+            Long userId = getEntityUserId(entityId, role);
+            if (userId == null) {
+                log.error("无法获取实体对应的用户ID: entityId={}, role={}", entityId, role);
+                return result;
+            }
+            
+            String redisKey = Constants.RedisKey.MESSAGE_USER + userId;
             // 获取之前的未读消息数量
-            int unreadCount = getUnreadMessageCount(entityId, diagId);
+            int unreadCount = getUnreadMessageCount(userId, diagId);
             
             if (unreadCount > 0) {
                 // 删除Hash中的字段
                 redisService.getMap(redisKey).remove(diagId.toString());
                 
-                // 获取用户对象
-                Long userId = getEntityUserId(entityId, role);
-                if (userId != null) {
-                    // 发送未读计数更新
-                    sendUnreadCountersToWebSocket(userId, entityId, role);
-                }
+                // 发送未读计数更新
+                sendUnreadCountersToWebSocket(userId, entityId, role);
             }
         } catch (Exception e) {
             log.error("清空Redis中的未读消息计数异常", e);
@@ -342,17 +345,17 @@ public class MedicalServiceImpl implements IMedicalService {
     }
 
     @Override
-    public int getUnreadMessageCount(Long entityId, Long diagId) {
-        log.info("获取用户的特定诊断未读消息数量, entityId: {}, diagId: {}", entityId, diagId);
+    public int getUnreadMessageCount(Long userId, Long diagId) {
+        log.info("获取用户的特定诊断未读消息数量, userId: {}, diagId: {}", userId, diagId);
         
-        if (entityId == null || diagId == null) {
-            log.warn("获取未读消息数量参数错误: entityId={}, diagId={}", entityId, diagId);
+        if (userId == null || diagId == null) {
+            log.warn("获取未读消息数量参数错误: userId={}, diagId={}", userId, diagId);
             return 0;
         }
 
         try {
         // 从Redis Hash中获取特定诊断的未读消息数量
-        String redisKey = Constants.RedisKey.MESSAGE_USER + entityId;
+        String redisKey = Constants.RedisKey.MESSAGE_USER + userId;
         Integer value = redisService.getIntFromMap(redisKey, diagId.toString());
             return value != null ? value : 0;
         } catch (Exception e) {
@@ -371,8 +374,15 @@ public class MedicalServiceImpl implements IMedicalService {
         }
         
         try {
+            // 获取用户ID
+            Long userId = getEntityUserId(entityId, role);
+            if (userId == null) {
+                log.error("无法获取实体对应的用户ID: entityId={}, role={}", entityId, role);
+                return new HashMap<>();
+            }
+            
             // 从Redis Hash中获取所有诊断的未读消息数量
-            String redisKey = Constants.RedisKey.MESSAGE_USER + entityId;
+            String redisKey = Constants.RedisKey.MESSAGE_USER + userId;
             RMap<String, Integer> redisMap = redisService.getMap(redisKey);
             
             if (redisMap == null || redisMap.isEmpty()) {
@@ -486,17 +496,17 @@ public class MedicalServiceImpl implements IMedicalService {
 
     /**
      * 异步更新用户未读消息数量
-     * @param entityId 实体ID
+     * @param userId 用户ID
      * @param diagId 诊断ID
      * @param count 增加的数量
      */
     @Override
     @Async("threadPoolTaskExecutor")
-    public void updateUnreadMessageCountAsync(Long entityId, Long diagId, int count) {
+    public void updateUnreadMessageCountAsync(Long userId, Long diagId, int count) {
         try {
-            log.info("异步更新用户未读消息数量, entityId: {}, diagId: {}, count: {}", entityId, diagId, count);
+            log.info("异步更新用户未读消息数量, userId: {}, diagId: {}, count: {}", userId, diagId, count);
             
-            String redisKey = Constants.RedisKey.MESSAGE_USER + entityId;
+            String redisKey = Constants.RedisKey.MESSAGE_USER + userId;
             RMap<String, Integer> redisMap = redisService.getMap(redisKey);
             
             // 获取当前未读数
@@ -658,11 +668,12 @@ public class MedicalServiceImpl implements IMedicalService {
     
     /**
      * 确保用户专属队列存在
-     * @param entityId 实体ID（患者ID或医生ID）
+     * @param userId 用户ID
      */
-    private void ensureUserQueueExists(Long entityId) {
+    private void ensureUserQueueExists(Long userId) {
         try {
-            String queueName = "user.queue." + entityId;
+            // 使用用户ID创建队列名
+            String queueName = "user.queue." + userId;
             
             // 检查队列是否存在
             Properties queueProps = rabbitAdmin.getQueueProperties(queueName);
@@ -679,13 +690,13 @@ public class MedicalServiceImpl implements IMedicalService {
                 rabbitAdmin.declareQueue(queue);
                 
                 // 创建绑定关系
-                String routingKey = Constants.MessageKey.USER_ROUTING_KEY_PREFIX + entityId;
+                String routingKey = Constants.MessageKey.USER_ROUTING_KEY_PREFIX + userId;
                 Binding binding = BindingBuilder.bind(queue)
                         .to(new TopicExchange(Constants.MessageKey.FEEDBACK_MESSAGE_QUEUE))
                         .with(routingKey);
                 rabbitAdmin.declareBinding(binding);
                 
-                log.info("为实体ID: {}创建了专用队列: {}", entityId, queueName);
+                log.info("为用户ID: {}创建了专用队列: {}", userId, queueName);
             }
         } catch (Exception e) {
             log.error("创建用户队列异常", e);

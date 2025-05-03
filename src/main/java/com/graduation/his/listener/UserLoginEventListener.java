@@ -72,37 +72,15 @@ public class UserLoginEventListener implements SaTokenListener {
      */
     private void pushPendingMessages(Long userId) {
         try {
-            // 1. 获取用户角色信息(医生/患者)
-            Patient patient = patientService.getByUserId(userId);
-            Doctor doctor = doctorService.getDoctorByUserId(userId);
-            
-            // 2. 获取实体ID
-            Long entityId = null;
-            Integer role = null;
-            if (patient != null) {
-                // 用户是患者
-                entityId = patient.getPatientId();
-                role = 0; // 患者角色
-                log.info("用户是患者，患者ID: {}", entityId);
-            } else if (doctor != null) {
-                // 用户是医生
-                entityId = doctor.getDoctorId();
-                role = 1; // 医生角色
-                log.info("用户是医生，医生ID: {}", entityId);
-            } else {
-                log.warn("用户既不是医生也不是患者，无法获取积压消息: {}", userId);
-                return;
-            }
-            
-            // 3. 检查用户专属队列是否存在
-            String userQueueName = "user.queue." + entityId;
+            // 直接使用用户ID创建队列名
+            String userQueueName = "user.queue." + userId;
             Properties queueProps = rabbitAdmin.getQueueProperties(userQueueName);
             if (queueProps == null) {
                 log.info("用户队列不存在，没有待处理消息: {}", userQueueName);
                 return;
             }
             
-            // 4. 获取队列中的消息数量
+            // 获取队列中的消息数量
             Integer messageCount = (Integer) queueProps.get("QUEUE_MESSAGE_COUNT");
             log.info("用户队列 {} 中有 {} 条消息", userQueueName, messageCount);
             
@@ -111,7 +89,7 @@ public class UserLoginEventListener implements SaTokenListener {
                 return;
             }
             
-            // 5. 批量获取消息
+            // 批量获取消息
             List<FeedbackMessageDTO> messages = new ArrayList<>();
             int batchSize = Math.min(messageCount, 20); // 每批最多处理20条消息
             int receivedCount = 0;
@@ -134,12 +112,10 @@ public class UserLoginEventListener implements SaTokenListener {
                 return;
             }
             
-            // 6. 批量推送消息到WebSocket
+            // 批量推送消息到WebSocket
             log.info("准备批量推送{}条消息给用户{}", messages.size(), userId);
             
             // 为了在Lambda中使用，需要使变量为final
-            final Long finalEntityId = entityId;
-            final Integer finalRole = role;
             final int finalReceivedCount = receivedCount;
             final List<FeedbackMessageDTO> finalMessages = new ArrayList<>(messages);
             
@@ -176,7 +152,7 @@ public class UserLoginEventListener implements SaTokenListener {
                     // 如果还有更多消息，递归处理下一批
                     if (finalReceivedCount == batchSize && messageCount > batchSize) {
                         log.info("队列中还有更多消息，继续处理下一批");
-                        pushNextBatch(userId, finalEntityId, finalRole, userQueueName);
+                        pushNextBatch(userId, userQueueName);
                     }
                 } catch (Exception e) {
                     log.error("批量推送消息异常", e);
@@ -190,11 +166,9 @@ public class UserLoginEventListener implements SaTokenListener {
     /**
      * 处理下一批消息
      * @param userId 用户ID
-     * @param entityId 实体ID
-     * @param role 用户角色
      * @param userQueueName 用户队列名
      */
-    private void pushNextBatch(Long userId, Long entityId, Integer role, String userQueueName) {
+    private void pushNextBatch(Long userId, String userQueueName) {
         try {
             // 检查队列状态
             Properties queueProps = rabbitAdmin.getQueueProperties(userQueueName);
@@ -259,7 +233,7 @@ public class UserLoginEventListener implements SaTokenListener {
             // 如果还有更多消息，递归处理下一批
             if (receivedCount == batchSize && messageCount > batchSize) {
                 log.info("队列中还有更多消息，继续处理下一批");
-                pushNextBatch(userId, entityId, role, userQueueName);
+                pushNextBatch(userId, userQueueName);
             }
         } catch (Exception e) {
             log.error("处理下一批消息异常", e);
