@@ -685,7 +685,7 @@ public class MedicalServiceImpl implements IMedicalService {
                 Queue queue = QueueBuilder.durable(queueName)
                         .withArgument("x-dead-letter-exchange", "dead.letter.exchange")
                         .withArgument("x-dead-letter-routing-key", "dead.letter.routing.key")
-                        .withArgument("x-message-ttl", 30 * 24 * 60 * 60 * 1000) // 30天过期
+                        .withArgument("x-message-ttl", 30L * 24 * 60 * 60 * 1000) // 30天过期
                         .withArgument("x-queue-mode", "lazy") // 将队列设置为lazy模式
                         .build();
                 rabbitAdmin.declareQueue(queue);
