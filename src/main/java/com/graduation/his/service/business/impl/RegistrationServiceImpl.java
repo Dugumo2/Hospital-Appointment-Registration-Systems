@@ -281,16 +281,20 @@ public class RegistrationServiceImpl implements IRegistrationService {
             String timeSlot = schedule.getTimeSlot();
             if (timeSlot != null && timeSlot.contains("-")) {
                 String endTimeStr = timeSlot.split("-")[1];
+                
+                // 先进行时间格式解析，单独处理格式错误
+                LocalTime endTime;
                 try {
-                    // 使用DateTimeFormatter指定时间格式为HH:mm
                     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
-                    LocalTime endTime = LocalTime.parse(endTimeStr, formatter);
-                    if (LocalTime.now().isAfter(endTime)) {
-                        throw new BusinessException("该时段已结束，无法预约");
-                    }
+                    endTime = LocalTime.parse(endTimeStr, formatter);
                 } catch (Exception e) {
-                    log.warn("解析时间段出错: {}", timeSlot);
+                    log.warn("解析时间段出错: {}, 错误: {}", timeSlot, e.getMessage());
                     throw new BusinessException("时间段格式错误");
+                }
+                
+                // 解析成功后再进行业务逻辑判断
+                if (LocalTime.now().isAfter(endTime)) {
+                    throw new BusinessException("该时段已结束，无法预约");
                 }
             }
         }
