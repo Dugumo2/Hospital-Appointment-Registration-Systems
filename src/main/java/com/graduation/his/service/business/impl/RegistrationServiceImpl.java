@@ -191,9 +191,9 @@ public class RegistrationServiceImpl implements IRegistrationService {
         log.debug("获取排班列表, deptId: {}, clinicId: {}, doctorId: {}, startDate: {}, endDate: {}", 
                 deptId, clinicId, doctorId, startDate, endDate);
         
-        // 设置默认日期范围：如果未指定起始日期，则使用今天；如果未指定结束日期，则使用起始日期后7天
+        // 设置默认日期范围：如果未指定起始日期，则使用今天；如果未指定结束日期，则使用起始日期后6天(共7天)
         LocalDate effectiveStartDate = startDate != null ? startDate : LocalDate.now();
-        LocalDate effectiveEndDate = endDate != null ? endDate : effectiveStartDate.plusDays(7);
+        LocalDate effectiveEndDate = endDate != null ? endDate : effectiveStartDate.plusDays(6);
         
         // 创建查询条件
         QueryWrapper<Schedule> queryWrapper = new QueryWrapper<>();
