@@ -42,6 +42,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.UUID;
@@ -281,7 +282,9 @@ public class RegistrationServiceImpl implements IRegistrationService {
             if (timeSlot != null && timeSlot.contains("-")) {
                 String endTimeStr = timeSlot.split("-")[1];
                 try {
-                    LocalTime endTime = LocalTime.parse(endTimeStr);
+                    // 使用DateTimeFormatter指定时间格式为HH:mm
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
+                    LocalTime endTime = LocalTime.parse(endTimeStr, formatter);
                     if (LocalTime.now().isAfter(endTime)) {
                         throw new BusinessException("该时段已结束，无法预约");
                     }
