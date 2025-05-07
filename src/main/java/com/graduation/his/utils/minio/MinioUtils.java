@@ -125,7 +125,7 @@ public class MinioUtils {
      * @return 对象名称
      */
     public String extractObjectNameFromUrl(String url) {
-        // 示例URL: http://minio-server:9000/avatars/avatar/xxx.jpg
+        // 示例URL: http://minio-server:9000/avatars/avatar/xxx.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256...
         if (url == null || url.isEmpty()) {
             return null;
         }
@@ -136,7 +136,15 @@ public class MinioUtils {
             if (bucketEndIndex > 0) {
                 int nextSlash = url.indexOf("/", bucketEndIndex + 1);
                 if (nextSlash > 0) {
-                    return url.substring(nextSlash + 1);
+                    // 查找查询参数开始的位置
+                    int queryIndex = url.indexOf("?", nextSlash);
+                    if (queryIndex > 0) {
+                        // 返回不包含查询参数的对象名称
+                        return url.substring(nextSlash + 1, queryIndex);
+                    } else {
+                        // 没有查询参数
+                        return url.substring(nextSlash + 1);
+                    }
                 }
             }
         } catch (Exception e) {

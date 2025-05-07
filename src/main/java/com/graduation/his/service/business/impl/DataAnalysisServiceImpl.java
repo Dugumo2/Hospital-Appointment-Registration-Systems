@@ -146,6 +146,16 @@ public class DataAnalysisServiceImpl implements IDataAnalysisService {
         // 获取该医生的患者ID列表
         List<Long> patientIds = getPatientIdsByDoctorId(doctorId);
         
+        // 初始化结果为空Map
+        Map<String, Integer> result = new TreeMap<>();
+        
+        // 如果患者列表为空，直接返回初始化的结果
+        if (patientIds == null || patientIds.isEmpty()) {
+            log.info("医生 {} 没有相关的患者记录", doctorId);
+            // 填充空缺的时间点
+            return fillMissingTimePoints(result, startDate, endDate, timeUnit);
+        }
+        
         // 查询时间范围内的所有AI问诊记录
         LambdaQueryWrapper<AiConsultRecord> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.in(AiConsultRecord::getPatientId, patientIds)
@@ -153,7 +163,6 @@ public class DataAnalysisServiceImpl implements IDataAnalysisService {
         List<AiConsultRecord> consultRecords = aiService.list(queryWrapper);
         
         // 使用指定的时间单位对数据进行分组统计
-        Map<String, Integer> result;
         DateTimeFormatter formatter;
         Function<AiConsultRecord, String> groupingFunction;
         
@@ -194,20 +203,26 @@ public class DataAnalysisServiceImpl implements IDataAnalysisService {
     public Map<String, Integer> getPatientAgeDistribution(Long doctorId) {
         log.info("获取患者年龄分布统计, doctorId: {}", doctorId);
         
-        // 获取该医生的患者ID列表
-        List<Long> patientIds = getPatientIdsByDoctorId(doctorId);
-        
-        // 查询该医生的所有患者信息
-        LambdaQueryWrapper<Patient> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.in(Patient::getPatientId, patientIds);
-        List<Patient> patients = patientService.list(queryWrapper);
-        
         // 定义年龄段
         String[] ageRanges = {"0-18", "19-30", "31-45", "46-60", "61-75", "76+"};
         Map<String, Integer> result = new LinkedHashMap<>();
         
         // 初始化结果
         Arrays.stream(ageRanges).forEach(range -> result.put(range, 0));
+        
+        // 获取该医生的患者ID列表
+        List<Long> patientIds = getPatientIdsByDoctorId(doctorId);
+        
+        // 如果患者列表为空，直接返回初始化的结果
+        if (patientIds == null || patientIds.isEmpty()) {
+            log.info("医生 {} 没有相关的患者记录", doctorId);
+            return result;
+        }
+        
+        // 查询该医生的所有患者信息
+        LambdaQueryWrapper<Patient> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(Patient::getPatientId, patientIds);
+        List<Patient> patients = patientService.list(queryWrapper);
         
         // 根据患者年龄进行分组
         for (Patient patient : patients) {
@@ -239,19 +254,25 @@ public class DataAnalysisServiceImpl implements IDataAnalysisService {
     public Map<String, Integer> getPatientGenderRatio(Long doctorId) {
         log.info("获取患者性别比例统计, doctorId: {}", doctorId);
         
-        // 获取该医生的患者ID列表
-        List<Long> patientIds = getPatientIdsByDoctorId(doctorId);
-        
-        // 查询该医生的所有患者信息
-        LambdaQueryWrapper<Patient> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.in(Patient::getPatientId, patientIds);
-        List<Patient> patients = patientService.list(queryWrapper);
-        
         // 初始化结果
         Map<String, Integer> result = new LinkedHashMap<>();
         result.put("男", 0);
         result.put("女", 0);
         result.put("未知", 0);
+        
+        // 获取该医生的患者ID列表
+        List<Long> patientIds = getPatientIdsByDoctorId(doctorId);
+        
+        // 如果患者列表为空，直接返回初始化的结果
+        if (patientIds == null || patientIds.isEmpty()) {
+            log.info("医生 {} 没有相关的患者记录", doctorId);
+            return result;
+        }
+        
+        // 查询该医生的所有患者信息
+        LambdaQueryWrapper<Patient> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(Patient::getPatientId, patientIds);
+        List<Patient> patients = patientService.list(queryWrapper);
         
         // 统计性别分布
         for (Patient patient : patients) {
@@ -275,16 +296,23 @@ public class DataAnalysisServiceImpl implements IDataAnalysisService {
     public Map<String, Integer> getPatientRegionalDistribution(Long doctorId) {
         log.info("获取患者地区分布统计, doctorId: {}", doctorId);
         
+        // 使用地区字段进行分组统计
+        Map<String, Integer> result = new LinkedHashMap<>();
+        result.put("未知", 0);
+        
         // 获取该医生的患者ID列表
         List<Long> patientIds = getPatientIdsByDoctorId(doctorId);
+        
+        // 如果患者列表为空，直接返回初始化的结果
+        if (patientIds == null || patientIds.isEmpty()) {
+            log.info("医生 {} 没有相关的患者记录", doctorId);
+            return result;
+        }
         
         // 查询该医生的所有患者信息
         LambdaQueryWrapper<Patient> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.in(Patient::getPatientId, patientIds);
         List<Patient> patients = patientService.list(queryWrapper);
-        
-        // 使用地区字段进行分组统计
-        Map<String, Integer> result = new LinkedHashMap<>();
         
         // 按地区分组统计
         for (Patient patient : patients) {
