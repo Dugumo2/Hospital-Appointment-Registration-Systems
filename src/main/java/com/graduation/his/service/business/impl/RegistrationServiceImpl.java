@@ -549,7 +549,14 @@ public class RegistrationServiceImpl implements IRegistrationService {
                 detailVO.setDoctorId(doctor.getDoctorId());
                 detailVO.setDoctorName(doctor.getName());
                 detailVO.setDoctorTitle(doctor.getTitle());
-                detailVO.setDoctorAvatar(null); // 如果有头像字段，这里可以设置
+                
+                // 从用户表获取医生头像
+                if (doctor.getUserId() != null) {
+                    User user = userService.getById(doctor.getUserId());
+                    if (user != null && user.getAvatar() != null) {
+                        detailVO.setDoctorAvatar(user.getAvatar());
+                    }
+                }
                 
                 // 查询门诊和科室信息
                 if (doctor.getClinicId() != null) {
@@ -651,8 +658,14 @@ public class RegistrationServiceImpl implements IRegistrationService {
                     vo.setDoctorName(doctor.getName());
                     vo.setDoctorTitle(doctor.getTitle());
                     vo.setDoctorIntroduction(doctor.getIntroduction());
-                    // 假设医生信息中有头像字段，这里设置头像
-                    vo.setDoctorAvatar(null);
+                    
+                    // 从用户表获取医生头像
+                    if (doctor.getUserId() != null) {
+                        User user = userService.getById(doctor.getUserId());
+                        if (user != null && user.getAvatar() != null) {
+                            vo.setDoctorAvatar(user.getAvatar());
+                        }
+                    }
                 }
             }
             
@@ -909,6 +922,14 @@ public class RegistrationServiceImpl implements IRegistrationService {
             if (clinic != null && clinic.getDeptId() != null) {
                 String deptName = departmentService.getDepartmentName(clinic.getDeptId());
                 vo.setDeptName(deptName);
+            }
+        }
+        
+        // 设置医生头像
+        if (doctor.getUserId() != null) {
+            User user = userService.getById(doctor.getUserId());
+            if (user != null && user.getAvatar() != null) {
+                vo.setAvatar(user.getAvatar());
             }
         }
         
